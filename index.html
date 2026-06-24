@@ -2020,7 +2020,9 @@ const CHECKLIST_ITEMS = [
 // ══ PERSISTÊNCIA ══
 const STORE_KEY = () => `sfhq3_${currentUser ? currentUser.id : 'local'}`;
 
+let isSaving = false;
 async function saveAll() {
+  isSaving = true;
   localStorage.setItem(STORE_KEY(), JSON.stringify(S));
   toast('Salvo','ok');
   if (sb && currentUser && !isOffline) {
@@ -2030,6 +2032,7 @@ async function saveAll() {
   localStorage.setItem(STORE_KEY(), JSON.stringify(S));
   const n=new Date();
   document.getElementById('sbSaveStatus').textContent=`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
+  isSaving = false;
 }
 
 async function syncToSupabase() {
@@ -2058,6 +2061,7 @@ async function syncToSupabase() {
 
 async function loadFromSupabase() {
   if (!sb||!currentUser||isOffline) return false;
+  if (isSaving) { console.log('Save em andamento — load bloqueado'); return false; }
   try {
     const {data, error} = await sb.from('user_data').select('data,updated_at').eq('user_id',currentUser.id).single();
     if (error || !data || !data.data) return false;
@@ -2911,7 +2915,8 @@ function calcAlvoGenetico(){
 // ══ CONFIG ══
 async function saveConfig(){
   S.config={...S.config,nome:document.getElementById('cfgNome').value||'',peso:parseFloat(document.getElementById('cfgPeso').value)||null,meta:parseFloat(document.getElementById('cfgMeta').value)||null,kcalMeta:parseInt(document.getElementById('cfgKcal').value)||2000,protMeta:parseInt(document.getElementById('cfgProt').value)||140};
-  await saveAll();toast('✓ Configurações salvas','ok');
+  await saveAll();
+  toast('✓ Configurações salvas','ok');
 }
 // ══ Relatório em texto ══
 function diasAtras(n){
