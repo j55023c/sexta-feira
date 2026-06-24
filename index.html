@@ -2034,18 +2034,25 @@ const CHECKLIST_ITEMS = [
 const STORE_KEY = () => `sfhq3_${currentUser ? currentUser.id : 'local'}`;
 
 let isSaving = false;
+let lastSaveTime = 0;
 async function saveAll() {
   isSaving = true;
-  localStorage.setItem(STORE_KEY(), JSON.stringify(S));
-  toast('Salvo','ok');
-  if (sb && currentUser && !isOffline) {
-    await syncToSupabase();
+  try {
+    localStorage.setItem(STORE_KEY(), JSON.stringify(S));
+    toast('Salvo','ok');
+    if (sb && currentUser && !isOffline) {
+      await syncToSupabase();
+    }
+    S._savedAt = Date.now();
+    lastSaveTime = S._savedAt;
+    localStorage.setItem(STORE_KEY(), JSON.stringify(S));
+    const n=new Date();
+    document.getElementById('sbSaveStatus').textContent=`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
+  } catch(e) {
+    console.warn('saveAll error:', e);
+  } finally {
+    isSaving = false;
   }
-  S._savedAt = Date.now();
-  localStorage.setItem(STORE_KEY(), JSON.stringify(S));
-  const n=new Date();
-  document.getElementById('sbSaveStatus').textContent=`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
-  isSaving = false;
 }
 
 async function syncToSupabase() {
@@ -2075,20 +2082,21 @@ async function syncToSupabase() {
 async function loadFromSupabase() {
   if (!sb||!currentUser||isOffline) return false;
   if (isSaving) { console.log('Save em andamento — load bloqueado'); return false; }
+  // Se acabou de salvar nesta sessão (< 5s), não sobrescreve
+  if (lastSaveTime && (Date.now() - lastSaveTime) < 5000) {
+    console.log('Save recente — load ignorado');
+    return false;
+  }
   try {
     const {data, error} = await sb.from('user_data').select('data,updated_at').eq('user_id',currentUser.id).single();
     if (error || !data || !data.data) return false;
 
-    // só sobrescreve se o dado do servidor for mais recente que o local
-    const localRaw = localStorage.getItem(STORE_KEY());
-    if (localRaw) {
-      const localData = JSON.parse(localRaw);
-      const localTs = localData._savedAt || 0;
-      const remoteTs = new Date(data.updated_at).getTime();
-      if (localTs >= remoteTs) {
-        console.log('Dados locais mais recentes — mantendo local');
-        return false;
-      }
+    // Servidor é a fonte de verdade ao abrir o app
+    // Só mantém local se foi salvo NESTA sessão (lastSaveTime > 0) e é mais recente
+    const remoteTs = new Date(data.updated_at).getTime();
+    if (lastSaveTime > 0 && lastSaveTime > remoteTs) {
+      console.log('Sessão atual tem dado mais recente — mantendo local');
+      return false;
     }
 
     const remote = data.data;
