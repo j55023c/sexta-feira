@@ -2073,7 +2073,7 @@ async function loadFromSupabase() {
       const localData = JSON.parse(localRaw);
       const localTs = localData._savedAt || 0;
       const remoteTs = new Date(data.updated_at).getTime();
-      if (localTs > remoteTs) {
+      if (localTs >= remoteTs) {
         console.log('Dados locais mais recentes — mantendo local');
         return false;
       }
@@ -2114,7 +2114,18 @@ function loadAll() {
   if (S.theme) applyTheme(S.theme);
   document.querySelectorAll('.notif-time').forEach(el=>{ if(S.notifTimes[el.dataset.key]) el.value=S.notifTimes[el.dataset.key]; });
   renderDaysEditGrid();
-  if (sb&&currentUser) loadFromSupabase().then(ok=>{if(ok){applyTheme(S.theme||'default');renderHome();}});
+  if (sb&&currentUser) {
+    loadFromSupabase().then(ok=>{
+      if(ok){
+        applyTheme(S.theme||'default');
+        // Recarrega campos visuais que podem ter sido sobrescritos pelo servidor
+        setV('cfgNome',S.config.nome); setV('cfgPeso',S.config.peso); setV('cfgMeta',S.config.meta);
+        setV('cfgKcal',S.config.kcalMeta||2000); setV('cfgProt',S.config.protMeta||160);
+        setV('pe-nome',S.protocolo.nome); setV('pe-desc',S.protocolo.desc); setV('pe-cardio',S.protocolo.cardio);
+        renderHome();
+      }
+    });
+  }
 }
 
 function setV(id,v){const el=document.getElementById(id);if(el&&v!==undefined&&v!==null)el.value=v;}
@@ -2904,9 +2915,9 @@ function calcAlvoGenetico(){
 }
 
 // ══ CONFIG ══
-function saveConfig(){
+async function saveConfig(){
   S.config={...S.config,nome:document.getElementById('cfgNome').value||'',peso:parseFloat(document.getElementById('cfgPeso').value)||null,meta:parseFloat(document.getElementById('cfgMeta').value)||null,kcalMeta:parseInt(document.getElementById('cfgKcal').value)||2000,protMeta:parseInt(document.getElementById('cfgProt').value)||140};
-  saveAll();toast('✓ Configurações salvas','ok');
+  await saveAll();toast('✓ Configurações salvas','ok');
 }
 // ══ Relatório em texto ══
 function diasAtras(n){
