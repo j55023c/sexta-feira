@@ -889,6 +889,20 @@ body.mobile-mode .taco-results{max-height:160px}
         <button class="btn btn-p" style="width:100%" onclick="aplicarMetasFase()">Aplicar essas metas na Nutrição</button>
       </div>
 
+      <div class="card" style="margin-bottom:16px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Metas manuais</div>
+        <div class="tip" style="margin-bottom:12px">Use a calculadora acima para gerar metas automáticas, ou ajuste manualmente aqui e clique em Salvar.</div>
+        <div class="grid2" style="margin-bottom:10px">
+          <div class="fgroup"><label class="form-label">Kcal meta/dia</label><input type="number" id="cfgKcal" placeholder="Ex: 2000"></div>
+          <div class="fgroup"><label class="form-label">Proteína meta (g)</label><input type="number" id="cfgProt" placeholder="Ex: 160"></div>
+        </div>
+        <div class="grid2" style="margin-bottom:10px">
+          <div class="fgroup"><label class="form-label">Carboidrato meta (g)</label><input type="number" id="cfgCarbo" placeholder="Ex: 220"></div>
+          <div class="fgroup"><label class="form-label">Gordura meta (g)</label><input type="number" id="cfgGord" placeholder="Ex: 55"></div>
+        </div>
+        <button class="btn btn-p" onclick="salvarMetasManuais()">Salvar metas</button>
+      </div>
+
       <div class="card">
         <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Perfil e altura-alvo genética</div>
         <div class="grid3">
@@ -917,8 +931,7 @@ body.mobile-mode .taco-results{max-height:160px}
         <div class="cfg-row"><div class="cfg-row-info"><div class="cfg-label">Nome</div></div><input type="text" id="cfgNome" style="max-width:200px;flex:1" placeholder="Seu nome"></div>
         <div class="cfg-row"><div class="cfg-row-info"><div class="cfg-label">Peso atual (kg)</div></div><input type="number" id="cfgPeso" style="max-width:120px;flex:1" step="0.1"></div>
         <div class="cfg-row"><div class="cfg-row-info"><div class="cfg-label">Meta de peso (kg)</div></div><input type="number" id="cfgMeta" style="max-width:120px;flex:1" step="0.1"></div>
-        <div class="cfg-row"><div class="cfg-row-info"><div class="cfg-label">Kcal meta/dia</div></div><input type="number" id="cfgKcal" style="max-width:120px;flex:1"></div>
-        <div class="cfg-row"><div class="cfg-row-info"><div class="cfg-label">Proteína meta (g)</div></div><input type="number" id="cfgProt" style="max-width:120px;flex:1"></div>
+        <div class="cfg-row"><div class="cfg-row-info"><div class="cfg-label">Kcal e proteína</div><div class="cfg-desc">Defina na aba <a href="#" onclick="go('fase',null);return false;" style="color:var(--accent)">Calculadora →</a></div></div></div>
       </div>
       <div class="cfg-section">
         <div class="cfg-section-title">Tema</div>
@@ -2118,7 +2131,6 @@ function loadAll() {
       if(ok){
         applyTheme(S.theme||'default');
         setV('cfgNome',S.config.nome); setV('cfgPeso',S.config.peso); setV('cfgMeta',S.config.meta);
-        setV('cfgKcal',S.config.kcalMeta||2000); setV('cfgProt',S.config.protMeta||160);
         setV('pe-nome',S.protocolo.nome); setV('pe-desc',S.protocolo.desc); setV('pe-cardio',S.protocolo.cardio);
         renderHome();
       }
@@ -2224,6 +2236,10 @@ function go(page,el){
     setV('fc-peso',S.config.peso); setV('fc-meta',S.config.meta);
     const lastFisico=Object.entries(S.fisicoLog).filter(([,v])=>v&&v.altura).sort((a,b)=>b[0].localeCompare(a[0]))[0];
     if(lastFisico) setV('fc-alt',lastFisico[1].altura);
+    setV('cfgKcal',S.config.kcalMeta||2000);
+    setV('cfgProt',S.config.protMeta||160);
+    setV('cfgCarbo',S.config.carboMeta||220);
+    setV('cfgGord',S.config.gordMeta||55);
   }
 }
 
@@ -2757,7 +2773,16 @@ function toggleCheck(key){
   if(idx>=0) c.splice(idx,1);else c.push(key);
   saveAll();renderFisicoChecklist();
 }
-function saveFisico(){
+async function salvarMetasManuais(){
+  const kcal=parseInt(document.getElementById('cfgKcal').value)||S.config.kcalMeta||2000;
+  const prot=parseInt(document.getElementById('cfgProt').value)||S.config.protMeta||160;
+  const carbo=parseInt(document.getElementById('cfgCarbo').value)||S.config.carboMeta||220;
+  const gord=parseInt(document.getElementById('cfgGord').value)||S.config.gordMeta||55;
+  S.config={...S.config,kcalMeta:kcal,protMeta:prot,carboMeta:carbo,gordMeta:gord};
+  await saveAll();
+  toast('✓ Metas salvas','ok');
+}
+async function saveFisico(){
   if(!S.fisicoLog[TODAY]) S.fisicoLog[TODAY]={};const l=S.fisicoLog[TODAY];
   l.peso=parseFloat(document.getElementById('fisicoPeso').value)||null;
   l.altura=parseFloat(document.getElementById('fisicoAltura').value)||null;
@@ -2766,7 +2791,7 @@ function saveFisico(){
   l.axial=selAxial||null; l.sensacao=selFeel||null;
   l.dor=document.getElementById('fisicoDor').value; l.cresceu=document.getElementById('fisicoCresceu').value;
   l.obs=document.getElementById('fisicoObs').value;l.date=TODAY;
-  saveAll();drawPesoChart();drawAlturaChart();toast('✓ Registro salvo','ok');
+  await saveAll();drawPesoChart();drawAlturaChart();toast('✓ Registro salvo','ok');
 }
 function drawPesoChart(){
   const canvas=document.getElementById('pesoChart');if(!canvas) return;
@@ -2914,9 +2939,8 @@ function calcAlvoGenetico(){
 
 // ══ CONFIG ══
 async function saveConfig(){
-  S.config={...S.config,nome:document.getElementById('cfgNome').value||'',peso:parseFloat(document.getElementById('cfgPeso').value)||null,meta:parseFloat(document.getElementById('cfgMeta').value)||null,kcalMeta:parseInt(document.getElementById('cfgKcal').value)||2000,protMeta:parseInt(document.getElementById('cfgProt').value)||140};
-  await saveAll();
-  toast('✓ Configurações salvas','ok');
+  S.config={...S.config,nome:document.getElementById('cfgNome').value||'',peso:parseFloat(document.getElementById('cfgPeso').value)||null,meta:parseFloat(document.getElementById('cfgMeta').value)||null};
+  await saveAll();toast('✓ Configurações salvas','ok');
 }
 // ══ Relatório em texto ══
 function diasAtras(n){
