@@ -2025,16 +2025,11 @@ async function saveAll() {
   toast('Salvo','ok');
   if (sb && currentUser && !isOffline) {
     await syncToSupabase();
-    // Após o servidor confirmar, atualiza _savedAt com timestamp pós-sync
-    // para que outros dispositivos reconheçam esta como versão mais recente
-    S._savedAt = Date.now();
-    localStorage.setItem(STORE_KEY(), JSON.stringify(S));
-  } else {
-    S._savedAt = Date.now();
-    localStorage.setItem(STORE_KEY(), JSON.stringify(S));
-    const n=new Date();
-    document.getElementById('sbSaveStatus').textContent=`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
   }
+  S._savedAt = Date.now();
+  localStorage.setItem(STORE_KEY(), JSON.stringify(S));
+  const n=new Date();
+  document.getElementById('sbSaveStatus').textContent=`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
 }
 
 async function syncToSupabase() {
@@ -2118,7 +2113,6 @@ function loadAll() {
     loadFromSupabase().then(ok=>{
       if(ok){
         applyTheme(S.theme||'default');
-        // Recarrega campos visuais que podem ter sido sobrescritos pelo servidor
         setV('cfgNome',S.config.nome); setV('cfgPeso',S.config.peso); setV('cfgMeta',S.config.meta);
         setV('cfgKcal',S.config.kcalMeta||2000); setV('cfgProt',S.config.protMeta||160);
         setV('pe-nome',S.protocolo.nome); setV('pe-desc',S.protocolo.desc); setV('pe-cardio',S.protocolo.cardio);
