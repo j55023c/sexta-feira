@@ -1837,6 +1837,9 @@ async function enterApp(email, name) {
     await dbSaveProfile();
   }
 
+  // Sincroniza variável local com o que veio do servidor
+  cardapioAtivoDieta = S.protocolo.cardapioAtivoId || 'padrao';
+
   // Aplica configurações carregadas
   applyTheme(S.theme||'default');
   setV('cfgNome',S.config.nome); setV('cfgPeso',S.config.peso); setV('cfgMeta',S.config.meta);
@@ -1858,6 +1861,32 @@ async function enterApp(email, name) {
 async function logout() {
   if (sb) await sb.auth.signOut();
   currentUser = null;
+  // Limpa estado em memória para não vazar dados entre contas
+  S = {
+    config:{ nome:'', peso:null, meta:null, kcalMeta:2000, protMeta:160, carboMeta:220, gordMeta:55 },
+    protocolo:{
+      nome:'Meu protocolo', desc:'Configure seu protocolo na aba Editar.',
+      cardio:'Defina sua rotina de cárdio na aba Editar.',
+      fase:'cutting', dataInicio:TODAY, cardapioAtivoId:'padrao',
+      dias:[
+        {dia:'Seg',nome:'Treino A',tipo:'up',tags:['Treino A']},
+        {dia:'Ter',nome:'Treino B',tipo:'lw',tags:['Treino B']},
+        {dia:'Qua',nome:'Descanso',tipo:'rest',tags:['Descanso']},
+        {dia:'Qui',nome:'Treino A',tipo:'up',tags:['Treino A']},
+        {dia:'Sex',nome:'Treino B',tipo:'lw',tags:['Treino B']},
+        {dia:'Sáb',nome:'Livre',tipo:'free',tags:['Descanso']},
+        {dia:'Dom',nome:'Livre',tipo:'free',tags:['Descanso']}
+      ]
+    },
+    cardapios:[{id:'padrao',nome:'Cardápio de exemplo',objetivo:'cutting',built_in:true}],
+    historicoFases:[],
+    materias:[], tarefasLivres:[], notes:[],
+    hiddenCards:{}, nutLog:{}, waterLog:{}, fisicoLog:{},
+    streak:{count:0,lastDate:''},
+    notifTimes:{cafe:'07:30',pre:'17:30',pos:'19:30',jantar:'20:30',fisico:'21:00'},
+    theme:'default'
+  };
+  cardapioAtivoDieta = 'padrao';
   document.getElementById('authScreen').style.display = 'flex';
   document.getElementById('authEmail').value = '';
   document.getElementById('authPassword').value = '';
@@ -2245,13 +2274,14 @@ async function dbLoadTarefas() {
 }
 
 // ── NUT LOG ──
-async function dbSaveNutLog() {
+async function dbSaveNutLog(date) {
   if (!sb||!currentUser) return;
+  const d = date || TODAY;
   const {error} = await sb.from('nut_log').upsert({
-    user_id: currentUser.id, date: TODAY, entries: S.nutLog[TODAY]||[],
+    user_id: currentUser.id, date: d, entries: S.nutLog[d]||[],
     updated_at: new Date().toISOString()
   }, {onConflict:'user_id,date'});
-  if (error) dbErr(error.message); else dbStatus('☁ Salvo');
+  if (error) dbErr(error.message); else { if(!date) dbStatus('☁ Salvo'); }
 }
 async function dbLoadNutLog() {
   if (!sb||!currentUser) return;
@@ -2279,6 +2309,19 @@ async function dbLoadWater() {
 }
 
 // ── FÍSICO LOG ──
+async function dbSaveFisicoDate(date, l) {
+  if (!sb||!currentUser) return;
+  const {error} = await sb.from('fisico_log').upsert({
+    user_id: currentUser.id, date: date,
+    peso: l.peso||null, altura: l.altura||null,
+    slept: l.slept||null, woke: l.woke||null,
+    musculos: l.musculos||null, axial: l.axial||null,
+    sensacao: l.sensacao||null, dor: l.dor||null,
+    cresceu: l.cresceu||null, obs: l.obs||null,
+    checks: l.checks||[], updated_at: new Date().toISOString()
+  }, {onConflict:'user_id,date'});
+  if (error) dbErr(error.message);
+}
 async function dbSaveFisico() {
   if (!sb||!currentUser) return;
   const l = S.fisicoLog[TODAY]||{};
@@ -2463,6 +2506,7 @@ function go(page,el){
   if(page==='protocolo') renderProtocolo();
   if(page==='dieta') {
     dietaAtiva='cafe';
+    cardapioAtivoDieta = S.protocolo.cardapioAtivoId || 'padrao';
     const selDieta=document.getElementById('selCardapioDieta');
     if(selDieta) selDieta.innerHTML=S.cardapios.map(c=>`<option value="${c.id}" ${c.id===cardapioAtivoDieta?'selected':''}>${c.nome}</option>`).join('');
     document.querySelectorAll('#page-dieta .pt-btn')[0].click();
@@ -3351,7 +3395,35 @@ function baixarRelatorio(){
 }
 
 function exportJSON(){const b=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`sfhq_backup_${TODAY}.json`;a.click();toast('📤 Backup exportado','ok');}
-function importJSON(input){const file=input.files[0];if(!file) return;const r=new FileReader();r.onload=async e=>{try{const imp=JSON.parse(e.target.result);if(imp.config) S.config={...S.config,...imp.config};if(imp.protocolo) S.protocolo={...S.protocolo,...imp.protocolo};if(imp.notes) S.notes=imp.notes;if(imp.materias) S.materias=imp.materias;if(imp.tarefasLivres) S.tarefasLivres=imp.tarefasLivres;if(imp.cardapios) S.cardapios=imp.cardapios;if(imp.nutLog) S.nutLog=imp.nutLog;if(imp.waterLog) S.waterLog=imp.waterLog;if(imp.fisicoLog) S.fisicoLog=imp.fisicoLog;await saveAll();go('home',null);toast('✓ Dados restaurados','ok');}catch(err){toast('Arquivo inválido','');}};r.readAsText(file);}
+function importJSON(input){
+  const file=input.files[0]; if(!file) return;
+  const r=new FileReader();
+  r.onload=async e=>{
+    try{
+      const imp=JSON.parse(e.target.result);
+      if(imp.config) S.config={...S.config,...imp.config};
+      if(imp.protocolo) S.protocolo={...S.protocolo,...imp.protocolo};
+      if(imp.notes) S.notes=imp.notes;
+      if(imp.materias) S.materias=imp.materias;
+      if(imp.tarefasLivres) S.tarefasLivres=imp.tarefasLivres;
+      if(imp.cardapios) S.cardapios=imp.cardapios;
+      if(imp.nutLog) S.nutLog=imp.nutLog;
+      if(imp.waterLog) S.waterLog=imp.waterLog;
+      if(imp.fisicoLog) S.fisicoLog=imp.fisicoLog;
+      // Salva tudo no Supabase
+      const saves = [dbSaveProfile(), dbSaveProtocolo()];
+      if(imp.notes) imp.notes.forEach(n=>saves.push(dbSaveNota(n)));
+      if(imp.materias) imp.materias.forEach(m=>saves.push(dbSaveMateria(m)));
+      if(imp.tarefasLivres) imp.tarefasLivres.forEach(t=>saves.push(dbSaveTarefa(t)));
+      if(imp.cardapios) imp.cardapios.forEach(c=>saves.push(dbSaveCardapio(c)));
+      if(imp.nutLog) Object.keys(imp.nutLog).forEach(d=>{ S.nutLog[d]=imp.nutLog[d]; saves.push(dbSaveNutLog(d)); });
+      if(imp.fisicoLog) Object.keys(imp.fisicoLog).forEach(d=>{ if(imp.fisicoLog[d]) saves.push(dbSaveFisicoDate(d,imp.fisicoLog[d])); });
+      await Promise.all(saves);
+      go('home',null); toast('✓ Dados restaurados','ok');
+    }catch(err){ console.error(err); toast('Arquivo inválido',''); }
+  };
+  r.readAsText(file);
+}
 function clearAll(){
   showConfirm('Limpar todos os dados', 'Todos os seus dados serão apagados permanentemente. Essa ação é irreversível.', 'Limpar tudo').then(async ok => {
     if (!ok) return;

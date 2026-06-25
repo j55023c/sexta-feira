@@ -1,7 +1,7 @@
 // ─── Sexta-feira HQ · Service Worker ───────────────────────────────
 // Mude o número da versão sempre que atualizar o app.
 // Isso força todos os dispositivos a baixar a versão nova.
-const VERSION = 'sfhq-v3';
+const VERSION = 'sfhq-v4';
 
 const CORE_FILES = [
   './index.html',
