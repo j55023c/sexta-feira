@@ -502,9 +502,6 @@ body.mobile-mode .taco-results{max-height:160px}
       <div class="auth-err" id="authErr"></div>
       <button class="auth-btn" id="authSubmitBtn" onclick="authSubmit()">Entrar</button>
     </div>
-    <div class="auth-offline">
-      <button class="auth-offline-btn" onclick="useOffline()">Usar sem conta (local)</button>
-    </div>
     <div class="auth-offline" id="forgotWrap">
       <button class="auth-offline-btn" onclick="forgotPassword()" id="forgotBtn">Esqueci minha senha</button>
     </div>
@@ -1769,10 +1766,9 @@ const SUPABASE_URL = 'https://loutjnohwmfnrelinakw.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvdXRqbm9od21mbnJlbGluYWt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxNjMxNTQsImV4cCI6MjA5NzczOTE1NH0.c3EQ6sKjA4IyEgExieQK1oQtXSKvz69SrM4GuoZfgJA';
 let sb = null;
 let currentUser = null;
-let isOffline = false;
 
 function initSupabase() {
-  try { sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY); } catch(e) { isOffline = true; }
+  try { sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY); } catch(e) { console.warn("Supabase init failed", e); }
 }
 
 // ══ AUTH ══
@@ -1788,7 +1784,7 @@ function authTab(mode) {
 }
 
 async function authSubmit() {
-  if (!sb || isOffline) { useOffline(); return; }
+  if (!sb) { document.getElementById('authErr').textContent = 'Sem conexão com o servidor. Verifique sua internet.'; return; }
   const email = document.getElementById('authEmail').value.trim();
   const pass  = document.getElementById('authPassword').value;
   const name  = document.getElementById('authName').value.trim();
@@ -1804,14 +1800,9 @@ async function authSubmit() {
     currentUser = res.data.user;
     enterApp(email, name||email.split('@')[0]);
   } catch(e) {
-    errEl.textContent = 'Erro de conexão. Use modo offline.';
+    errEl.textContent = 'Erro de conexão. Verifique sua internet e tente novamente.';
     document.getElementById('authSubmitBtn').textContent = authMode==='login'?'Entrar':'Criar conta';
   }
-}
-
-function useOffline() {
-  isOffline = true; currentUser = null;
-  enterApp('local','Usuário local');
 }
 
 async function forgotPassword() {
@@ -1843,7 +1834,7 @@ async function enterApp(email, name) {
   loadAll();
 
   // 2. Se tem conta, aguarda o servidor — ele sempre ganha
-  if (sb && currentUser && !isOffline) {
+  if (sb && currentUser) {
     const ok = await loadFromSupabase();
     if (ok) {
       // Re-aplica dados do servidor nos campos de UI
@@ -1865,7 +1856,7 @@ async function enterApp(email, name) {
 }
 
 async function logout() {
-  if (sb && !isOffline) await sb.auth.signOut();
+  if (sb) await sb.auth.signOut();
   currentUser = null;
   document.getElementById('authScreen').style.display = 'flex';
   document.getElementById('authEmail').value = '';
@@ -2099,18 +2090,21 @@ const CHECKLIST_ITEMS = [
 const STORE_KEY = () => `sfhq3_${currentUser ? currentUser.id : 'local'}`;
 
 let isSaving = false;
-let lastSaveTime = 0;
+let _dirty = false; // true quando há mudança local não enviada ao servidor
+
+function markDirty() { _dirty = true; }
+
 async function saveAll() {
+  if (isSaving) return;
   isSaving = true;
+  _dirty = false;
   try {
+    S._version = Date.now();
     localStorage.setItem(STORE_KEY(), JSON.stringify(S));
     toast('Salvo','ok');
-    if (sb && currentUser && !isOffline) {
+    if (sb && currentUser) {
       await syncToSupabase();
     }
-    S._savedAt = Date.now();
-    lastSaveTime = S._savedAt;
-    localStorage.setItem(STORE_KEY(), JSON.stringify(S));
     const n=new Date();
     document.getElementById('sbSaveStatus').textContent=`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
   } catch(e) {
@@ -2121,9 +2115,29 @@ async function saveAll() {
 }
 
 async function syncToSupabase() {
-  if (!sb||!currentUser||isOffline) return;
+  if (!sb||!currentUser) return;
   try {
     document.getElementById('sbSaveStatus').textContent = 'Sincronizando...';
+
+    // Verifica se o servidor tem versão mais recente (outro dispositivo salvou antes)
+    const {data: remoteCheck} = await sb.from('user_data')
+      .select('data').eq('user_id', currentUser.id).single();
+
+    if (remoteCheck?.data?._version && remoteCheck.data._version > S._version) {
+      // Conflito: servidor mais novo — descarta save local, recarrega do servidor
+      console.warn('Conflito detectado — servidor mais recente. Descartando save local.');
+      const remote = remoteCheck.data;
+      const mergedProtocolo = {...S.protocolo, ...(remote.protocolo||{})};
+      S = {...S, ...remote, protocolo: mergedProtocolo};
+      localStorage.setItem(STORE_KEY(), JSON.stringify(S));
+      document.getElementById('sbSaveStatus').textContent = '↻ Atualizado de outro dispositivo';
+      toast('↻ Dados atualizados de outro dispositivo','ok');
+      const activePage = document.querySelector('.page.active')?.id?.replace('page-','');
+      if (activePage) go(activePage, null);
+      return;
+    }
+
+    // Servidor está desatualizado — podemos sobrescrever
     const {error} = await sb.from('user_data').upsert(
       {user_id:currentUser.id, data:S, updated_at:new Date().toISOString()},
       {onConflict:'user_id'}
@@ -2145,7 +2159,7 @@ async function syncToSupabase() {
 }
 
 async function loadFromSupabase() {
-  if (!sb||!currentUser||isOffline) return false;
+  if (!sb||!currentUser) return false;
   if (isSaving) { console.log('Save em andamento — load bloqueado'); return false; }
   try {
     const {data, error} = await sb.from('user_data').select('data').eq('user_id',currentUser.id).single();
@@ -2153,7 +2167,6 @@ async function loadFromSupabase() {
     const remote = data.data;
     const mergedProtocolo = {...S.protocolo, ...(remote.protocolo||{})};
     S = {...S, ...remote, protocolo: mergedProtocolo};
-    // Atualiza cache local com dados do servidor
     localStorage.setItem(STORE_KEY(), JSON.stringify(S));
     console.log('Dados carregados do servidor');
     return true;
@@ -2190,7 +2203,8 @@ function loadAll() {
 }
 
 function setV(id,v){const el=document.getElementById(id);if(el&&v!==undefined&&v!==null)el.value=v;}
-setInterval(()=>{ saveAll(); },30000);
+// Auto-save a cada 30s, mas só se houver mudança real
+setInterval(()=>{ if(_dirty) saveAll(); },30000);
 
 // ══ STREAK ══
 function updateStreak() {
@@ -3250,6 +3264,10 @@ function closeInputModal(action) {
 }
 
 function closeModals(){document.getElementById('overlay').classList.remove('open');document.querySelectorAll('.modal').forEach(m=>m.classList.remove('open'));}
+// Marca dirty em qualquer interação que modifique dados
+document.addEventListener('input', e => { if(e.target.closest('.content,.note-editor')) markDirty(); });
+document.addEventListener('change', e => { if(e.target.closest('.content')) markDirty(); });
+
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){closeModals();closeMealDrawer();}
   if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();saveAll();}
