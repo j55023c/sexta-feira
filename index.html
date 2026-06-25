@@ -240,6 +240,9 @@ textarea{resize:vertical;min-height:75px}
 .note-li-title{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
 .note-li-meta{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace}
 .note-li-preview{font-size:11px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.note-li-del{background:none;border:none;cursor:pointer;color:var(--hint);font-size:11px;padding:2px 5px;border-radius:5px;transition:all .12s;opacity:0;flex-shrink:0}
+.note-li:hover .note-li-del{opacity:1}
+.note-li-del:hover{background:var(--red-bg);color:var(--red)}
 .note-editor{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
 .note-editor-top{padding:12px 16px;border-bottom:1px solid var(--border2);display:flex;align-items:center;gap:10px}
 .note-title-inp{flex:1;background:none;border:none;font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--text);outline:none;padding:0}
@@ -1122,6 +1125,26 @@ body.mobile-mode .taco-results{max-height:160px}
   </div>
 </div>
 
+<!-- Modal: Confirmação genérica -->
+<div class="modal" id="modal-confirm">
+  <div class="modal-head"><div class="modal-title" id="confirmTitle">Confirmar</div><button class="modal-x" onclick="closeConfirm(false)">✕</button></div>
+  <div class="modal-body"><p id="confirmMsg" style="font-size:13px;line-height:1.65;color:var(--muted)"></p></div>
+  <div class="modal-foot">
+    <button class="btn btn-s btn-sm" onclick="closeConfirm(false)">Cancelar</button>
+    <button class="btn btn-d btn-sm" id="confirmOkBtn" onclick="closeConfirm(true)">Confirmar</button>
+  </div>
+</div>
+
+<!-- Modal: Input genérico -->
+<div class="modal" id="modal-input">
+  <div class="modal-head"><div class="modal-title" id="inputTitle">Informar</div><button class="modal-x" onclick="closeInputModal(null)">✕</button></div>
+  <div class="modal-body" id="inputModalBody"></div>
+  <div class="modal-foot">
+    <button class="btn btn-s btn-sm" onclick="closeInputModal(null)">Cancelar</button>
+    <button class="btn btn-p btn-sm" onclick="closeInputModal('ok')">OK</button>
+  </div>
+</div>
+
 <!-- MEAL DRAWER -->
 <div class="dr-overlay" id="drOverlay" onclick="closeMealDrawer()"></div>
 <div class="meal-drawer" id="mealDrawer">
@@ -1673,18 +1696,26 @@ function closeMealDrawer() {
 function addRefeicaoCustom(tab){
   const cardapio = S.cardapios.find(c=>c.id===cardapioAtivoDieta);
   if (!cardapio) return;
-  const nome = prompt('Nome da refeição:');
-  if (!nome || !nome.trim()) return;
-  const kcal = parseFloat(prompt('Calorias aproximadas (kcal):','0')) || 0;
-  const prot = parseFloat(prompt('Proteína (g):','0')) || 0;
-  const carbo = parseFloat(prompt('Carboidrato (g):','0')) || 0;
-  const gord = parseFloat(prompt('Gordura (g):','0')) || 0;
-  if (!cardapio.refeicoes) cardapio.refeicoes = {cafe:[],almoco:[],pre:[],pos:[],jantar:[]};
-  if (!cardapio.refeicoes[tab]) cardapio.refeicoes[tab] = [];
-  cardapio.refeicoes[tab].push({nome:nome.trim(),kcal,prot,carbo,gord,timing:'',ingredientes:[]});
-  saveAll();
-  renderDieta(tab);
-  toast('✓ Refeição adicionada','ok');
+  showInputModal('Nova refeição', [
+    {id:'nome',  label:'Nome da refeição',        placeholder:'Ex: Omelete com aveia'},
+    {id:'kcal',  label:'Calorias (kcal)',          placeholder:'Ex: 450', type:'number'},
+    {id:'prot',  label:'Proteína (g)',             placeholder:'Ex: 35',  type:'number'},
+    {id:'carbo', label:'Carboidrato (g)',          placeholder:'Ex: 40',  type:'number'},
+    {id:'gord',  label:'Gordura (g)',              placeholder:'Ex: 12',  type:'number'},
+  ]).then(r => {
+    if (!r || !r.nome) return;
+    if (!cardapio.refeicoes) cardapio.refeicoes = {cafe:[],almoco:[],pre:[],pos:[],jantar:[]};
+    if (!cardapio.refeicoes[tab]) cardapio.refeicoes[tab] = [];
+    cardapio.refeicoes[tab].push({
+      nome: r.nome,
+      kcal: parseFloat(r.kcal)||0,
+      prot: parseFloat(r.prot)||0,
+      carbo: parseFloat(r.carbo)||0,
+      gord: parseFloat(r.gord)||0,
+      timing:'', ingredientes:[]
+    });
+    saveAll(); renderDieta(tab); toast('✓ Refeição adicionada','ok');
+  });
 }
 
 function openMealDrawerCustom(tab, idx){
@@ -2357,8 +2388,19 @@ function toggleTL(type,...args){
   saveAll();renderTarefas();renderHome();
 }
 function delTask(mi,ti){S.materias[mi].tasks.splice(ti,1);saveAll();renderTarefas();}
-function delMateria(i){if(!confirm(`Remover "${S.materias[i].nome}"?`)) return;S.materias.splice(i,1);saveAll();renderTarefas();renderHome();}
-function addTaskInline(mi){const n=prompt('Nome da atividade:');if(!n) return;S.materias[mi].tasks.push({id:Date.now(),nome:n.trim(),done:false,prazo:''});saveAll();renderTarefas();}
+function delMateria(i){
+  showConfirm('Remover matéria', `Remover "${S.materias[i].nome}" e todas as suas tarefas?`, 'Remover').then(ok => {
+    if (!ok) return;
+    S.materias.splice(i,1); saveAll(); renderTarefas(); renderHome();
+  });
+}
+function addTaskInline(mi){
+  showInputModal('Nova atividade', [{id:'nome', label:'Nome da atividade', placeholder:'Ex: Resolver exercícios'}]).then(r => {
+    if (!r || !r.nome) return;
+    S.materias[mi].tasks.push({id:Date.now(), nome:r.nome, done:false, prazo:''});
+    saveAll(); renderTarefas();
+  });
+}
 function addMateria(){
   const nome=document.getElementById('mm-nome').value.trim(),tag=document.getElementById('mm-tag').value,prazo=document.getElementById('mm-prazo').value,raw=document.getElementById('mm-tasks').value.trim();
   if(!nome) return toast('Informe o nome','');
@@ -2394,10 +2436,28 @@ function renderNotesList(){
   const q=(document.getElementById('noteSearch').value||'').toLowerCase();
   const f=S.notes.filter(n=>n.title.toLowerCase().includes(q)||n.body.toLowerCase().includes(q));
   document.getElementById('notesList').innerHTML=f.map(n=>`<div class="note-li ${n.id===activeNoteId?'active':''}" data-id="${n.id}" onclick="openNote(${n.id})">
-    <div class="note-li-title">${n.title||'Sem título'}</div>
+    <div style="display:flex;align-items:flex-start;gap:4px">
+      <div class="note-li-title" style="flex:1">${n.title||'Sem título'}</div>
+      <button class="note-li-del" onclick="event.stopPropagation();delNote(${n.id})" title="Apagar nota">✕</button>
+    </div>
     <div style="display:flex;justify-content:space-between"><div class="note-li-meta">${fmtDate(n.date)}</div><span class="tag tag-muted" style="font-size:8px">${n.tag}</span></div>
     <div class="note-li-preview">${n.body.slice(0,55)}${n.body.length>55?'...':''}</div>
   </div>`).join('')||'<div style="color:var(--muted);font-size:12px;padding:8px">Nenhuma nota.</div>';
+}
+function delNote(id){
+  const n = S.notes.find(x=>x.id===id);
+  if (!n) return;
+  showConfirm('Apagar nota', `Apagar "${n.title||'Sem título'}"? Essa ação não pode ser desfeita.`, 'Apagar').then(ok => {
+    if (!ok) return;
+    S.notes = S.notes.filter(x=>x.id!==id);
+    if (activeNoteId === id) {
+      activeNoteId = S.notes.length ? S.notes[0].id : null;
+      if (activeNoteId) openNote(activeNoteId);
+      else { document.getElementById('noteTitleInp').value=''; document.getElementById('noteBodyInp').value=''; }
+    }
+    saveAll(); renderNotesList();
+    toast('Nota apagada','ok');
+  });
 }
 function addNotaRapida(){
   const title=document.getElementById('mnr-titulo').value.trim()||'Nota rápida',body=document.getElementById('mnr-corpo').value.trim(),tag=document.getElementById('mnr-tag').value;
@@ -2474,18 +2534,21 @@ function apagarCardapioAtivo(){
   if(S.cardapios.length<=1){ toast('Você precisa manter pelo menos 1 cardápio','') ; return; }
   const ativo=S.cardapios.find(c=>c.id===S.protocolo.cardapioAtivoId);
   if(!ativo) return;
-  if(!confirm(`Apagar o cardápio "${ativo.nome}"? Todas as refeições salvas nele serão perdidas. Essa ação não pode ser desfeita.`)) return;
-
-  S.cardapios = S.cardapios.filter(c=>c.id!==ativo.id);
-  // promove o primeiro cardápio restante como ativo
-  const novoAtivo = S.cardapios[0];
-  S.protocolo.cardapioAtivoId = novoAtivo.id;
-  cardapioAtivoDieta = novoAtivo.id;
-
-  saveAll();
-  renderProtocolo();
-  if(document.getElementById('page-dieta').classList.contains('active')) renderDieta(dietaAtiva);
-  toast(`✓ "${ativo.nome}" apagado. Cardápio ativo agora: "${novoAtivo.nome}"`,'ok');
+  showConfirm(
+    'Apagar cardápio',
+    `Apagar "${ativo.nome}"? Todas as refeições salvas nele serão perdidas. Essa ação não pode ser desfeita.`,
+    'Apagar'
+  ).then(ok => {
+    if (!ok) return;
+    S.cardapios = S.cardapios.filter(c=>c.id!==ativo.id);
+    const novoAtivo = S.cardapios[0];
+    S.protocolo.cardapioAtivoId = novoAtivo.id;
+    cardapioAtivoDieta = novoAtivo.id;
+    saveAll();
+    renderProtocolo();
+    if(document.getElementById('page-dieta').classList.contains('active')) renderDieta(dietaAtiva);
+    toast(`✓ "${ativo.nome}" apagado. Cardápio ativo agora: "${novoAtivo.nome}"`,'ok');
+  });
 }
 
 function criarCardapio(){
@@ -3089,7 +3152,12 @@ function baixarRelatorio(){
 
 function exportJSON(){const b=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`sfhq_backup_${TODAY}.json`;a.click();toast('📤 Backup exportado','ok');}
 function importJSON(input){const file=input.files[0];if(!file) return;const r=new FileReader();r.onload=e=>{try{S={...S,...JSON.parse(e.target.result)};saveAll();loadAll();go('home',null);toast('✓ Dados restaurados','ok');}catch{toast('Arquivo inválido','');}};r.readAsText(file);}
-function clearAll(){if(!confirm('Tem certeza? Irreversível.')) return;localStorage.removeItem(STORE_KEY());location.reload();}
+function clearAll(){
+  showConfirm('Limpar todos os dados', 'Todos os seus dados serão apagados permanentemente. Essa ação é irreversível.', 'Limpar tudo').then(ok => {
+    if (!ok) return;
+    localStorage.removeItem(STORE_KEY()); location.reload();
+  });
+}
 
 // ══ MODAIS ══
 function openModal(id){
@@ -3121,6 +3189,66 @@ function updateMfCardapioOptions(){
     (outros.length?`<optgroup label="Outros cardápios">${outros.map(c=>`<option value="${c.id}">${c.nome}</option>`).join('')}</optgroup>`:'');
 }
 document.addEventListener('change',e=>{if(e.target.id==='mf-fase') updateMfCardapioOptions();});
+// ══ MODAIS GENÉRICOS (substitutos de confirm/prompt nativos) ══
+let _confirmResolve = null;
+function showConfirm(title, msg, okLabel='Confirmar', danger=true) {
+  return new Promise(resolve => {
+    _confirmResolve = resolve;
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmMsg').textContent = msg;
+    const btn = document.getElementById('confirmOkBtn');
+    btn.textContent = okLabel;
+    btn.className = danger ? 'btn btn-d btn-sm' : 'btn btn-p btn-sm';
+    document.getElementById('overlay').classList.add('open');
+    document.getElementById('modal-confirm').classList.add('open');
+  });
+}
+function closeConfirm(result) {
+  document.getElementById('overlay').classList.remove('open');
+  document.getElementById('modal-confirm').classList.remove('open');
+  if (_confirmResolve) { _confirmResolve(result); _confirmResolve = null; }
+}
+
+let _inputResolve = null;
+function showInputModal(title, fields) {
+  // fields: [{id, label, type='text', placeholder='', value=''}]
+  return new Promise(resolve => {
+    _inputResolve = resolve;
+    document.getElementById('inputTitle').textContent = title;
+    const body = document.getElementById('inputModalBody');
+    body.innerHTML = fields.map(f => `
+      <div class="fgroup">
+        <label class="form-label">${f.label}</label>
+        <input type="${f.type||'text'}" id="inp_${f.id}" placeholder="${f.placeholder||''}" value="${f.value||''}" style="width:100%">
+      </div>`).join('');
+    document.getElementById('overlay').classList.add('open');
+    document.getElementById('modal-input').classList.add('open');
+    // foca no primeiro campo
+    setTimeout(() => {
+      const first = body.querySelector('input');
+      if(first) first.focus();
+      // Enter confirma se for campo único, ou no último campo
+      body.querySelectorAll('input').forEach((inp, i, arr) => {
+        inp.addEventListener('keydown', e => { if(e.key==='Enter') closeInputModal('ok'); });
+      });
+    }, 80);
+  });
+}
+function closeInputModal(action) {
+  document.getElementById('overlay').classList.remove('open');
+  document.getElementById('modal-input').classList.remove('open');
+  if (!_inputResolve) return;
+  if (action === null) { _inputResolve(null); _inputResolve = null; return; }
+  // coleta valores de todos os inputs
+  const result = {};
+  document.querySelectorAll('#inputModalBody input').forEach(el => {
+    const key = el.id.replace('inp_', '');
+    result[key] = el.value.trim();
+  });
+  _inputResolve(result);
+  _inputResolve = null;
+}
+
 function closeModals(){document.getElementById('overlay').classList.remove('open');document.querySelectorAll('.modal').forEach(m=>m.classList.remove('open'));}
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){closeModals();closeMealDrawer();}
