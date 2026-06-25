@@ -114,6 +114,15 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--text);displa
 .auth-offline-btn{background:none;border:1px solid rgba(255,255,255,.1);color:#6b6660;font-family:'Syne',sans-serif;font-size:11px;padding:7px 14px;border-radius:8px;cursor:pointer;transition:all .14s}
 .auth-offline-btn:hover{border-color:#c8441a;color:#c8441a}
 
+/* ══ LOADING SCREEN ══ */
+.loading-screen{position:fixed;inset:0;background:var(--sidebar-bg);display:none;align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:16px}
+.loading-screen.show{display:flex}
+.loading-logo{font-size:22px;font-weight:800;color:#f4f1eb}
+.loading-logo em{font-style:normal;color:#c8441a}
+.loading-msg{font-size:12px;color:#6b6660;font-family:'DM Mono',monospace;letter-spacing:1px}
+.loading-dots::after{content:'';animation:dots 1.5s steps(3,end) infinite}
+@keyframes dots{0%{content:''}33%{content:'.'}66%{content:'..'}100%{content:'...'}}
+
 /* ══ SIDEBAR ══ */
 .sidebar{width:var(--sidebar);flex-shrink:0;background:var(--sidebar-bg);height:100vh;display:flex;flex-direction:column;overflow-y:auto;scrollbar-width:none;transition:width .25s,transform .25s}
 .sidebar::-webkit-scrollbar{display:none}
@@ -501,6 +510,12 @@ body.mobile-mode .taco-results{max-height:160px}
 </div>
 
 <div class="mob-overlay" id="mobOverlay" onclick="closeMobMenu()"></div>
+
+<!-- LOADING -->
+<div class="loading-screen" id="loadingScreen">
+  <div class="loading-logo">Sexta-<em>feira</em></div>
+  <div class="loading-msg">Carregando sua conta<span class="loading-dots"></span></div>
+</div>
 
 <!-- SIDEBAR -->
 <nav class="sidebar" id="sidebar">
@@ -1789,12 +1804,31 @@ async function forgotPassword() {
   document.getElementById('forgotBtn').textContent = 'Esqueci minha senha';
 }
 
-function enterApp(email, name) {
+async function enterApp(email, name) {
   document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('loadingScreen').classList.add('show');
+
+  // 1. Carrega localStorage como base (resposta instantânea)
+  loadAll();
+
+  // 2. Se tem conta, aguarda o servidor — ele sempre ganha
+  if (sb && currentUser && !isOffline) {
+    const ok = await loadFromSupabase();
+    if (ok) {
+      // Re-aplica dados do servidor nos campos de UI
+      applyTheme(S.theme||'default');
+      setV('cfgNome',S.config.nome); setV('cfgPeso',S.config.peso); setV('cfgMeta',S.config.meta);
+      setV('cfgKcal',S.config.kcalMeta||2000); setV('cfgProt',S.config.protMeta||160);
+      setV('pe-nome',S.protocolo.nome); setV('pe-desc',S.protocolo.desc); setV('pe-cardio',S.protocolo.cardio);
+      renderDaysEditGrid();
+    }
+  }
+
+  document.getElementById('loadingScreen').classList.remove('show');
   document.getElementById('sbUser').textContent = email === 'local' ? 'Modo offline' : email;
   document.getElementById('cfgUserEmail').textContent = email === 'local' ? 'Modo offline (sem conta)' : email;
-  loadAll(); updateStreak(); initNotifications();
-  // só usa o nome de fallback (ex: "Usuário local") se o usuário ainda não personalizou o próprio nome
+
+  updateStreak(); initNotifications();
   if (!S.config.nome) S.config.nome = name && name !== 'Usuário local' ? name : '';
   renderHome(); renderFisicoChecklist();
 }
@@ -2082,26 +2116,14 @@ async function syncToSupabase() {
 async function loadFromSupabase() {
   if (!sb||!currentUser||isOffline) return false;
   if (isSaving) { console.log('Save em andamento — load bloqueado'); return false; }
-  // Se acabou de salvar nesta sessão (< 5s), não sobrescreve
-  if (lastSaveTime && (Date.now() - lastSaveTime) < 5000) {
-    console.log('Save recente — load ignorado');
-    return false;
-  }
   try {
-    const {data, error} = await sb.from('user_data').select('data,updated_at').eq('user_id',currentUser.id).single();
+    const {data, error} = await sb.from('user_data').select('data').eq('user_id',currentUser.id).single();
     if (error || !data || !data.data) return false;
-
-    // Servidor é a fonte de verdade ao abrir o app
-    // Só mantém local se foi salvo NESTA sessão (lastSaveTime > 0) e é mais recente
-    const remoteTs = new Date(data.updated_at).getTime();
-    if (lastSaveTime > 0 && lastSaveTime > remoteTs) {
-      console.log('Sessão atual tem dado mais recente — mantendo local');
-      return false;
-    }
-
     const remote = data.data;
     const mergedProtocolo = {...S.protocolo, ...(remote.protocolo||{})};
     S = {...S, ...remote, protocolo: mergedProtocolo};
+    // Atualiza cache local com dados do servidor
+    localStorage.setItem(STORE_KEY(), JSON.stringify(S));
     console.log('Dados carregados do servidor');
     return true;
   } catch(e) {
@@ -2134,16 +2156,6 @@ function loadAll() {
   if (S.theme) applyTheme(S.theme);
   document.querySelectorAll('.notif-time').forEach(el=>{ if(S.notifTimes[el.dataset.key]) el.value=S.notifTimes[el.dataset.key]; });
   renderDaysEditGrid();
-  if (sb&&currentUser) {
-    loadFromSupabase().then(ok=>{
-      if(ok){
-        applyTheme(S.theme||'default');
-        setV('cfgNome',S.config.nome); setV('cfgPeso',S.config.peso); setV('cfgMeta',S.config.meta);
-        setV('pe-nome',S.protocolo.nome); setV('pe-desc',S.protocolo.desc); setV('pe-cardio',S.protocolo.cardio);
-        renderHome();
-      }
-    });
-  }
 }
 
 function setV(id,v){const el=document.getElementById(id);if(el&&v!==undefined&&v!==null)el.value=v;}
