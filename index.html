@@ -563,7 +563,7 @@ body.mobile-mode .taco-results{max-height:160px}
     <div class="topbar-actions">
       <button class="tb-btn" onclick="openModal('modal-tarefa')">+ Tarefa</button>
       <button class="tb-btn" onclick="openModal('modal-nota-rapida')">+ Nota</button>
-      <button class="tb-btn primary" onclick="forceSyncNow()">↻ Sincronizar</button>
+      <button class="tb-btn primary" onclick="forceSyncNow()">↻</button>
     </div>
   </div>
 
@@ -1688,7 +1688,7 @@ function closeMealDrawer() {
 }
 
 // ══ Refeições de cardápios customizados (não-padrão) ══
-function addRefeicaoCustom(tab){
+async function addRefeicaoCustom(tab){
   const cardapio = S.cardapios.find(c=>c.id===cardapioAtivoDieta);
   if (!cardapio) return;
   showInputModal('Nova refeição', [
@@ -1697,7 +1697,7 @@ function addRefeicaoCustom(tab){
     {id:'prot',  label:'Proteína (g)',             placeholder:'Ex: 35',  type:'number'},
     {id:'carbo', label:'Carboidrato (g)',          placeholder:'Ex: 40',  type:'number'},
     {id:'gord',  label:'Gordura (g)',              placeholder:'Ex: 12',  type:'number'},
-  ]).then(r => {
+  ]).then(async r => {
     if (!r || !r.nome) return;
     if (!cardapio.refeicoes) cardapio.refeicoes = {cafe:[],almoco:[],pre:[],pos:[],jantar:[]};
     if (!cardapio.refeicoes[tab]) cardapio.refeicoes[tab] = [];
@@ -1709,7 +1709,7 @@ function addRefeicaoCustom(tab){
       gord: parseFloat(r.gord)||0,
       timing:'', ingredientes:[]
     });
-    dbSaveCardapio(cardapio); renderDieta(tab); toast('✓ Refeição adicionada','ok');
+    await dbSaveCardapio(cardapio); renderDieta(tab); toast('✓ Refeição adicionada','ok');
   });
 }
 
@@ -1748,11 +1748,11 @@ function openMealDrawerCustom(tab, idx){
   document.getElementById('mealDrawer').classList.add('open');
 }
 
-function delRefeicaoCustom(tab, idx){
+async function delRefeicaoCustom(tab, idx){
   const cardapio = S.cardapios.find(c=>c.id===cardapioAtivoDieta);
   if (!cardapio || !cardapio.refeicoes || !cardapio.refeicoes[tab]) return;
   cardapio.refeicoes[tab].splice(idx,1);
-  dbSaveCardapio(cardapio);
+  await dbSaveCardapio(cardapio);
   closeMealDrawer();
   renderDieta(tab);
   toast('Refeição removida','ok');
@@ -1767,6 +1767,68 @@ let currentUser = null;
 
 function initSupabase() {
   try { sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY); } catch(e) { console.warn("Supabase init failed", e); }
+}
+
+// ══ REALTIME — atualização automática entre dispositivos ══
+let realtimeChannel = null;
+async function initRealtime() {
+  if (!sb || !currentUser) return;
+  // Remove canal anterior se existir
+  if (realtimeChannel) { await sb.removeChannel(realtimeChannel); realtimeChannel = null; }
+
+  realtimeChannel = sb.channel('db-changes-' + currentUser.id)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'protocolo',    filter: `user_id=eq.${currentUser.id}` }, () => handleRemoteChange('protocolo'))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'cardapios',    filter: `user_id=eq.${currentUser.id}` }, () => handleRemoteChange('cardapios'))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'notas',        filter: `user_id=eq.${currentUser.id}` }, () => handleRemoteChange('notas'))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'materias',     filter: `user_id=eq.${currentUser.id}` }, () => handleRemoteChange('materias'))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'tarefas_livres', filter: `user_id=eq.${currentUser.id}` }, () => handleRemoteChange('tarefas'))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'nut_log',      filter: `user_id=eq.${currentUser.id}` }, () => handleRemoteChange('nutlog'))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'water_log',    filter: `user_id=eq.${currentUser.id}` }, () => handleRemoteChange('water'))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'fisico_log',   filter: `user_id=eq.${currentUser.id}` }, () => handleRemoteChange('fisico'))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles',     filter: `user_id=eq.${currentUser.id}` }, () => handleRemoteChange('profile'))
+    .subscribe();
+}
+
+// Debounce para não recarregar mil vezes se vários saves chegarem juntos
+let _realtimeTimer = null;
+let _pendingChanges = new Set();
+function handleRemoteChange(type) {
+  _pendingChanges.add(type);
+  clearTimeout(_realtimeTimer);
+  _realtimeTimer = setTimeout(async () => {
+    const changes = new Set(_pendingChanges);
+    _pendingChanges.clear();
+    await applyRemoteChanges(changes);
+  }, 400); // aguarda 400ms para agrupar mudanças simultâneas
+}
+
+async function applyRemoteChanges(changes) {
+  // Recarrega só o que mudou
+  const loads = [];
+  if (changes.has('profile'))   loads.push(dbLoadProfile());
+  if (changes.has('protocolo') || changes.has('cardapios')) {
+    loads.push(dbLoadProtocolo());
+    loads.push(dbLoadCardapios());
+  }
+  if (changes.has('notas'))     loads.push(dbLoadNotas());
+  if (changes.has('materias') || changes.has('tarefas')) {
+    loads.push(dbLoadMaterias());
+    loads.push(dbLoadTarefas());
+  }
+  if (changes.has('nutlog'))    loads.push(dbLoadNutLog());
+  if (changes.has('water'))     loads.push(dbLoadWater());
+  if (changes.has('fisico'))    loads.push(dbLoadFisico());
+  await Promise.all(loads);
+
+  // Re-renderiza a página ativa com os dados novos
+  const activePage = document.querySelector('.page.active')?.id?.replace('page-','');
+  if (activePage) {
+    if (changes.has('profile')) applyTheme(S.theme||'default');
+    // Re-renderiza silenciosamente sem toast para não atrapalhar
+    const el = document.querySelector(`.nav-item[onclick*="'${activePage}'"]`);
+    go(activePage, el);
+  }
+  document.getElementById('sbSaveStatus').textContent = '☁ Sincronizado';
 }
 
 // ══ AUTH ══
@@ -1854,11 +1916,12 @@ async function enterApp(email, name) {
   document.getElementById('cfgUserEmail').textContent = email;
   document.getElementById('sbSaveStatus').textContent = '☁ Sincronizado';
 
-  updateStreak(); initNotifications();
+  updateStreak(); initNotifications(); initRealtime();
   renderHome(); renderFisicoChecklist();
 }
 
 async function logout() {
+  if (realtimeChannel && sb) { await sb.removeChannel(realtimeChannel); realtimeChannel = null; }
   if (sb) await sb.auth.signOut();
   currentUser = null;
   // Limpa estado em memória para não vazar dados entre contas
@@ -2625,10 +2688,10 @@ function toggleTL(type,...args){
 }
 function delTask(mi,ti){S.materias[mi].tasks.splice(ti,1);dbSaveMateria(S.materias[mi]);renderTarefas();}
 function delMateria(i){
-  showConfirm('Remover matéria', `Remover "${S.materias[i].nome}" e todas as suas tarefas?`, 'Remover').then(ok => {
+  showConfirm('Remover matéria', `Remover "${S.materias[i].nome}" e todas as suas tarefas?`, 'Remover').then(async ok => {
     if (!ok) return;
     const id=S.materias[i].id; S.materias.splice(i,1);
-    dbDeleteMateria(id); renderTarefas(); renderHome();
+    await dbDeleteMateria(id); renderTarefas(); renderHome();
   });
 }
 function addTaskInline(mi){
@@ -2687,10 +2750,10 @@ function renderNotesList(){
 function delNote(id){
   const n = S.notes.find(x=>x.id===id);
   if (!n) return;
-  showConfirm('Apagar nota', `Apagar "${n.title||'Sem título'}"? Essa ação não pode ser desfeita.`, 'Apagar').then(ok => {
+  showConfirm('Apagar nota', `Apagar "${n.title||'Sem título'}"? Essa ação não pode ser desfeita.`, 'Apagar').then(async ok => {
     if (!ok) return;
     S.notes = S.notes.filter(x=>x.id!==id);
-    dbDeleteNota(id);
+    await dbDeleteNota(id);
     if (activeNoteId === id) {
       activeNoteId = S.notes.length ? S.notes[0].id : null;
       if (activeNoteId) openNote(activeNoteId);
@@ -2763,10 +2826,10 @@ function renderCardapioSelector(){
   if(btnDel) btnDel.disabled = S.cardapios.length<=1;
 }
 
-function setCardapioAtivo(id){
+async function setCardapioAtivo(id){
   S.protocolo.cardapioAtivoId=id;
   cardapioAtivoDieta=id;
-  dbSaveProtocolo();
+  await dbSaveProtocolo();
   renderProtocolo();
   toast('✓ Cardápio ativo atualizado','ok');
 }
@@ -2779,27 +2842,27 @@ function apagarCardapioAtivo(){
     'Apagar cardápio',
     `Apagar "${ativo.nome}"? Todas as refeições salvas nele serão perdidas. Essa ação não pode ser desfeita.`,
     'Apagar'
-  ).then(ok => {
+  ).then(async ok => {
     if (!ok) return;
     const idApagar=ativo.id; S.cardapios = S.cardapios.filter(c=>c.id!==ativo.id);
     const novoAtivo = S.cardapios[0];
     S.protocolo.cardapioAtivoId = novoAtivo.id;
     cardapioAtivoDieta = novoAtivo.id;
-    dbDeleteCardapio(idApagar); dbSaveProtocolo();
+    await dbDeleteCardapio(idApagar); await dbSaveProtocolo();
     renderProtocolo();
     if(document.getElementById('page-dieta').classList.contains('active')) renderDieta(dietaAtiva);
     toast(`✓ "${ativo.nome}" apagado. Cardápio ativo agora: "${novoAtivo.nome}"`,'ok');
   });
 }
 
-function criarCardapio(){
+async function criarCardapio(){
   const nome=document.getElementById('nc-nome').value.trim();
   const objetivo=document.getElementById('nc-objetivo').value;
   if(!nome) return toast('Informe o nome','');
   const id='c'+Date.now();
   S.cardapios.push({id,nome,objetivo,built_in:false,refeicoes:{cafe:[],almoco:[],pre:[],pos:[],jantar:[]}});
   const novo=S.cardapios[S.cardapios.length-1];
-  closeModals();dbSaveCardapio(novo);renderCardapioSelector();
+  closeModals(); await dbSaveCardapio(novo); renderCardapioSelector();
   toast('✓ Cardápio criado','ok');
   document.getElementById('nc-nome').value='';
 }
@@ -2903,7 +2966,7 @@ function processarRespostaIA(){
   toast(`✓ ${parsed.length} refeições identificadas`,'ok');
 }
 
-function confirmarImportIA(){
+async function confirmarImportIA(){
   if (!iaParsedRefeicoes.length) return;
   const destino = document.getElementById('iaDestino').value;
   let cardapio;
@@ -2927,7 +2990,7 @@ function confirmarImportIA(){
   cardapioAtivoDieta = cardapio.id;
   S.protocolo.cardapioAtivoId = cardapio.id;
 
-  dbSaveCardapio(cardapio); dbSaveProtocolo();
+  await dbSaveCardapio(cardapio); await dbSaveProtocolo();
   closeModals();
   renderCardapioSelector();
   if (document.getElementById('page-dieta').classList.contains('active')) renderDieta(dietaAtiva);
@@ -2978,7 +3041,7 @@ function renderDaysEditGrid(){
     <select onchange="S.protocolo.dias[${i}].tipo=this.value"><option value="up" ${d.tipo==='up'?'selected':''}>Upper</option><option value="lw" ${d.tipo==='lw'?'selected':''}>Lower</option><option value="rest" ${d.tipo==='rest'?'selected':''}>Descanso</option><option value="free" ${d.tipo==='free'?'selected':''}>Livre</option></select>
   </div>`).join('');
 }
-function saveProtocolo(){S.protocolo.nome=document.getElementById('pe-nome').value;S.protocolo.desc=document.getElementById('pe-desc').value;S.protocolo.cardio=document.getElementById('pe-cardio').value;dbSaveProtocolo();renderProtocolo();toast('✓ Protocolo salvo','ok');}
+async function saveProtocolo(){S.protocolo.nome=document.getElementById('pe-nome').value;S.protocolo.desc=document.getElementById('pe-desc').value;S.protocolo.cardio=document.getElementById('pe-cardio').value;await dbSaveProtocolo();renderProtocolo();toast('✓ Protocolo salvo','ok');}
 
 // ══ NUTRIÇÃO TRACKER ══
 let tacoSelected=null;
