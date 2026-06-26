@@ -1771,64 +1771,68 @@ function initSupabase() {
 
 // ══ REALTIME — atualização automática entre dispositivos ══
 let realtimeChannel = null;
+let _savingCount = 0; // contador de saves em andamento — suprime Realtime próprio
+
+// Wraps em torno de cada save para suprimir o echo do Realtime
+async function dbRun(fn) {
+  _savingCount++;
+  try { await fn(); }
+  finally { 
+    // Aguarda um pouco mais que o debounce do Realtime (400ms) antes de liberar
+    setTimeout(() => { _savingCount = Math.max(0, _savingCount - 1); }, 600);
+  }
+}
+
 async function initRealtime() {
   if (!sb || !currentUser) return;
-  // Remove canal anterior se existir
   if (realtimeChannel) { await sb.removeChannel(realtimeChannel); realtimeChannel = null; }
 
   realtimeChannel = sb.channel('db-changes-' + currentUser.id)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'protocolo',    filter: `user_id=eq.${currentUser.id}` }, () => handleRemoteChange('protocolo'))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'cardapios',    filter: `user_id=eq.${currentUser.id}` }, () => handleRemoteChange('cardapios'))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'notas',        filter: `user_id=eq.${currentUser.id}` }, () => handleRemoteChange('notas'))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'materias',     filter: `user_id=eq.${currentUser.id}` }, () => handleRemoteChange('materias'))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'protocolo',      filter: `user_id=eq.${currentUser.id}` }, () => handleRemoteChange('protocolo'))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'cardapios',      filter: `user_id=eq.${currentUser.id}` }, () => handleRemoteChange('cardapios'))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'notas',          filter: `user_id=eq.${currentUser.id}` }, () => handleRemoteChange('notas'))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'materias',       filter: `user_id=eq.${currentUser.id}` }, () => handleRemoteChange('materias'))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'tarefas_livres', filter: `user_id=eq.${currentUser.id}` }, () => handleRemoteChange('tarefas'))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'nut_log',      filter: `user_id=eq.${currentUser.id}` }, () => handleRemoteChange('nutlog'))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'water_log',    filter: `user_id=eq.${currentUser.id}` }, () => handleRemoteChange('water'))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'fisico_log',   filter: `user_id=eq.${currentUser.id}` }, () => handleRemoteChange('fisico'))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles',     filter: `user_id=eq.${currentUser.id}` }, () => handleRemoteChange('profile'))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'nut_log',        filter: `user_id=eq.${currentUser.id}` }, () => handleRemoteChange('nutlog'))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'water_log',      filter: `user_id=eq.${currentUser.id}` }, () => handleRemoteChange('water'))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'fisico_log',     filter: `user_id=eq.${currentUser.id}` }, () => handleRemoteChange('fisico'))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles',       filter: `user_id=eq.${currentUser.id}` }, () => handleRemoteChange('profile'))
     .subscribe();
 }
 
-// Debounce para não recarregar mil vezes se vários saves chegarem juntos
 let _realtimeTimer = null;
 let _pendingChanges = new Set();
 function handleRemoteChange(type) {
+  // Se este dispositivo está salvando, o evento é nosso — ignora
+  if (_savingCount > 0) return;
   _pendingChanges.add(type);
   clearTimeout(_realtimeTimer);
   _realtimeTimer = setTimeout(async () => {
     const changes = new Set(_pendingChanges);
     _pendingChanges.clear();
     await applyRemoteChanges(changes);
-  }, 400); // aguarda 400ms para agrupar mudanças simultâneas
+  }, 400);
 }
 
 async function applyRemoteChanges(changes) {
-  // Recarrega só o que mudou
   const loads = [];
-  if (changes.has('profile'))   loads.push(dbLoadProfile());
-  if (changes.has('protocolo') || changes.has('cardapios')) {
-    loads.push(dbLoadProtocolo());
-    loads.push(dbLoadCardapios());
-  }
-  if (changes.has('notas'))     loads.push(dbLoadNotas());
-  if (changes.has('materias') || changes.has('tarefas')) {
-    loads.push(dbLoadMaterias());
-    loads.push(dbLoadTarefas());
-  }
-  if (changes.has('nutlog'))    loads.push(dbLoadNutLog());
-  if (changes.has('water'))     loads.push(dbLoadWater());
-  if (changes.has('fisico'))    loads.push(dbLoadFisico());
+  if (changes.has('profile'))                               loads.push(dbLoadProfile());
+  if (changes.has('protocolo') || changes.has('cardapios')){ loads.push(dbLoadProtocolo()); loads.push(dbLoadCardapios()); }
+  if (changes.has('notas'))                                 loads.push(dbLoadNotas());
+  if (changes.has('materias') || changes.has('tarefas'))  { loads.push(dbLoadMaterias()); loads.push(dbLoadTarefas()); }
+  if (changes.has('nutlog'))                                loads.push(dbLoadNutLog());
+  if (changes.has('water'))                                 loads.push(dbLoadWater());
+  if (changes.has('fisico'))                                loads.push(dbLoadFisico());
   await Promise.all(loads);
 
-  // Re-renderiza a página ativa com os dados novos
   const activePage = document.querySelector('.page.active')?.id?.replace('page-','');
   if (activePage) {
     if (changes.has('profile')) applyTheme(S.theme||'default');
-    // Re-renderiza silenciosamente sem toast para não atrapalhar
     const el = document.querySelector(`.nav-item[onclick*="'${activePage}'"]`);
     go(activePage, el);
   }
   document.getElementById('sbSaveStatus').textContent = '☁ Sincronizado';
+  toast('↻ Atualizado','ok');
 }
 
 // ══ AUTH ══
@@ -2195,6 +2199,7 @@ function dbErr(msg) {
 // ── PROFILES ──
 async function dbSaveProfile() {
   if (!sb||!currentUser) return;
+  await dbRun(async () => {
   const {error} = await sb.from('profiles').upsert({
     user_id: currentUser.id,
     nome: S.config.nome, peso: S.config.peso, meta_peso: S.config.meta,
@@ -2206,6 +2211,7 @@ async function dbSaveProfile() {
     updated_at: new Date().toISOString()
   }, {onConflict:'user_id'});
   if (error) dbErr(error.message); else dbStatus('☁ Salvo');
+  }); // dbRun
 }
 async function dbLoadProfile() {
   if (!sb||!currentUser) return;
@@ -2224,6 +2230,7 @@ async function dbLoadProfile() {
 async function dbSaveProtocolo() {
   if (!sb||!currentUser) return;
   const p = S.protocolo;
+  await dbRun(async () => {
   const {error} = await sb.from('protocolo').upsert({
     user_id: currentUser.id,
     nome: p.nome, desc_texto: p.desc, cardio: p.cardio,
@@ -2232,6 +2239,7 @@ async function dbSaveProtocolo() {
     updated_at: new Date().toISOString()
   }, {onConflict:'user_id'});
   if (error) dbErr(error.message); else dbStatus('☁ Salvo');
+  }); // dbRun
 }
 async function dbLoadProtocolo() {
   if (!sb||!currentUser) return;
@@ -2249,17 +2257,21 @@ async function dbLoadProtocolo() {
 // ── CARDÁPIOS ──
 async function dbSaveCardapio(c) {
   if (!sb||!currentUser) return;
+  await dbRun(async () => {
   const {error} = await sb.from('cardapios').upsert({
     id: c.id, user_id: currentUser.id, nome: c.nome,
     objetivo: c.objetivo, built_in: c.built_in||false,
     refeicoes: c.refeicoes||{}, updated_at: new Date().toISOString()
   }, {onConflict:'id,user_id'});
   if (error) dbErr(error.message); else dbStatus('☁ Salvo');
+  }); // dbRun
 }
 async function dbDeleteCardapio(id) {
   if (!sb||!currentUser) return;
+  await dbRun(async () => {
   const {error} = await sb.from('cardapios').delete().eq('id',id).eq('user_id',currentUser.id);
   if (error) dbErr(error.message);
+  }); // dbRun
 }
 async function dbLoadCardapios() {
   if (!sb||!currentUser) return;
@@ -2273,17 +2285,21 @@ async function dbLoadCardapios() {
 // ── NOTAS ──
 async function dbSaveNota(n) {
   if (!sb||!currentUser) return;
+  await dbRun(async () => {
   const {error} = await sb.from('notas').upsert({
     id: n.id, user_id: currentUser.id, title: n.title||'',
     body: n.body||'', tag: n.tag||'geral', date: n.date||TODAY,
     updated_at: new Date().toISOString()
   }, {onConflict:'id,user_id'});
   if (error) dbErr(error.message);
+  }); // dbRun
 }
 async function dbDeleteNota(id) {
   if (!sb||!currentUser) return;
+  await dbRun(async () => {
   const {error} = await sb.from('notas').delete().eq('id',id).eq('user_id',currentUser.id);
   if (error) dbErr(error.message);
+  }); // dbRun
 }
 async function dbLoadNotas() {
   if (!sb||!currentUser) return;
@@ -2295,17 +2311,21 @@ async function dbLoadNotas() {
 // ── MATÉRIAS ──
 async function dbSaveMateria(m) {
   if (!sb||!currentUser) return;
+  await dbRun(async () => {
   const {error} = await sb.from('materias').upsert({
     id: m.id, user_id: currentUser.id, nome: m.nome,
     tag: m.tag||'senai', prazo: m.prazo||'', tasks: m.tasks||[],
     updated_at: new Date().toISOString()
   }, {onConflict:'id,user_id'});
   if (error) dbErr(error.message); else dbStatus('☁ Salvo');
+  }); // dbRun
 }
 async function dbDeleteMateria(id) {
   if (!sb||!currentUser) return;
+  await dbRun(async () => {
   const {error} = await sb.from('materias').delete().eq('id',id).eq('user_id',currentUser.id);
   if (error) dbErr(error.message);
+  }); // dbRun
 }
 async function dbLoadMaterias() {
   if (!sb||!currentUser) return;
@@ -2317,17 +2337,21 @@ async function dbLoadMaterias() {
 // ── TAREFAS LIVRES ──
 async function dbSaveTarefa(t) {
   if (!sb||!currentUser) return;
+  await dbRun(async () => {
   const {error} = await sb.from('tarefas_livres').upsert({
     id: t.id, user_id: currentUser.id, nome: t.nome,
     tag: t.tag||'pessoal', done: t.done||false, prazo: t.prazo||'',
     updated_at: new Date().toISOString()
   }, {onConflict:'id,user_id'});
   if (error) dbErr(error.message);
+  }); // dbRun
 }
 async function dbDeleteTarefa(id) {
   if (!sb||!currentUser) return;
+  await dbRun(async () => {
   const {error} = await sb.from('tarefas_livres').delete().eq('id',id).eq('user_id',currentUser.id);
   if (error) dbErr(error.message);
+  }); // dbRun
 }
 async function dbLoadTarefas() {
   if (!sb||!currentUser) return;
@@ -2340,11 +2364,13 @@ async function dbLoadTarefas() {
 async function dbSaveNutLog(date) {
   if (!sb||!currentUser) return;
   const d = date || TODAY;
+  await dbRun(async () => {
   const {error} = await sb.from('nut_log').upsert({
     user_id: currentUser.id, date: d, entries: S.nutLog[d]||[],
     updated_at: new Date().toISOString()
   }, {onConflict:'user_id,date'});
   if (error) dbErr(error.message); else { if(!date) dbStatus('☁ Salvo'); }
+  }); // dbRun
 }
 async function dbLoadNutLog() {
   if (!sb||!currentUser) return;
@@ -2357,11 +2383,13 @@ async function dbLoadNutLog() {
 // ── WATER LOG ──
 async function dbSaveWater() {
   if (!sb||!currentUser) return;
+  await dbRun(async () => {
   const {error} = await sb.from('water_log').upsert({
     user_id: currentUser.id, date: TODAY, ml: S.waterLog[TODAY]||0,
     updated_at: new Date().toISOString()
   }, {onConflict:'user_id,date'});
   if (error) dbErr(error.message);
+  }); // dbRun
 }
 async function dbLoadWater() {
   if (!sb||!currentUser) return;
@@ -2374,6 +2402,7 @@ async function dbLoadWater() {
 // ── FÍSICO LOG ──
 async function dbSaveFisicoDate(date, l) {
   if (!sb||!currentUser) return;
+  await dbRun(async () => {
   const {error} = await sb.from('fisico_log').upsert({
     user_id: currentUser.id, date: date,
     peso: l.peso||null, altura: l.altura||null,
@@ -2384,10 +2413,12 @@ async function dbSaveFisicoDate(date, l) {
     checks: l.checks||[], updated_at: new Date().toISOString()
   }, {onConflict:'user_id,date'});
   if (error) dbErr(error.message);
+  }); // dbRun
 }
 async function dbSaveFisico() {
   if (!sb||!currentUser) return;
   const l = S.fisicoLog[TODAY]||{};
+  await dbRun(async () => {
   const {error} = await sb.from('fisico_log').upsert({
     user_id: currentUser.id, date: TODAY,
     peso: l.peso||null, altura: l.altura||null,
@@ -2398,6 +2429,7 @@ async function dbSaveFisico() {
     checks: l.checks||[], updated_at: new Date().toISOString()
   }, {onConflict:'user_id,date'});
   if (error) dbErr(error.message); else dbStatus('☁ Salvo');
+  }); // dbRun
 }
 async function dbLoadFisico() {
   if (!sb||!currentUser) return;
@@ -2414,11 +2446,13 @@ async function dbLoadFisico() {
 // ── HISTÓRICO DE FASES ──
 async function dbSaveHistoricoFase(h) {
   if (!sb||!currentUser) return;
+  await dbRun(async () => {
   await sb.from('historico_fases').insert({
     user_id: currentUser.id, fase: h.fase, nome: h.nome,
     data_inicio: h.dataInicio, data_fim: h.dataFim,
     kcal_meta: h.kcalMeta, prot_meta: h.protMeta
   });
+  }); // dbRun
 }
 async function dbLoadHistoricoFases() {
   if (!sb||!currentUser) return;
