@@ -2941,7 +2941,7 @@ function confirmarImportIA(){
   toast(`✓ ${cardapio.refeicoes ? Object.values(cardapio.refeicoes).flat().length : ''} refeições adicionadas a "${cardapio.nome}"`,'ok');
 }
 
-function confirmarMudancaFase(){
+async function confirmarMudancaFase(){
   const novaFase=document.getElementById('mf-fase').value;
   const novoCardapio=document.getElementById('mf-cardapio').value;
   const novoNome=document.getElementById('mf-nome').value.trim();
@@ -2955,11 +2955,17 @@ function confirmarMudancaFase(){
   S.protocolo.fase=novaFase;
   S.protocolo.dataInicio=TODAY;
   if(novoNome) S.protocolo.nome=novoNome;
-  if(novoCardapio) S.protocolo.cardapioAtivoId=novoCardapio;
+  if(novoCardapio){
+    S.protocolo.cardapioAtivoId=novoCardapio;
+    cardapioAtivoDieta=novoCardapio;
+  }
 
-  dbSaveHistoricoFase(S.historicoFases[S.historicoFases.length-1]);
-  dbSaveProtocolo(); dbSaveProfile();
-  closeModals();renderProtocolo();
+  closeModals();
+  document.getElementById('sbSaveStatus').textContent='Salvando...';
+  await dbSaveHistoricoFase(S.historicoFases[S.historicoFases.length-1]);
+  await dbSaveProtocolo();
+  await dbSaveProfile();
+  renderProtocolo();
   toast(`✓ Fase alterada para ${FASE_INFO[novaFase].label}`,'ok');
 }
 
