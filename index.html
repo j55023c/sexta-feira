@@ -563,7 +563,6 @@ body.mobile-mode .taco-results{max-height:160px}
     <div class="topbar-actions">
       <button class="tb-btn" onclick="openModal('modal-tarefa')">+ Tarefa</button>
       <button class="tb-btn" onclick="openModal('modal-nota-rapida')">+ Nota</button>
-      <button class="tb-btn primary" onclick="forceSyncNow()">↻</button>
     </div>
   </div>
 
@@ -2500,22 +2499,6 @@ async function saveAll() {
   dbStatus('☁ Salvo');
 }
 
-// Força recarga completa do servidor (botão ↻ Sincronizar)
-async function forceSyncNow() {
-  document.getElementById('sbSaveStatus').textContent = 'Atualizando...';
-  await dbLoadAll();
-  applyTheme(S.theme||'default');
-  setV('cfgNome',S.config.nome); setV('cfgPeso',S.config.peso); setV('cfgMeta',S.config.meta);
-  setV('cfgKcal',S.config.kcalMeta||2000); setV('cfgProt',S.config.protMeta||160);
-  setV('cfgCarbo',S.config.carboMeta||220); setV('cfgGord',S.config.gordMeta||55);
-  setV('pe-nome',S.protocolo.nome); setV('pe-desc',S.protocolo.desc); setV('pe-cardio',S.protocolo.cardio);
-  renderDaysEditGrid();
-  const activePage = document.querySelector('.page.active')?.id?.replace('page-','');
-  if (activePage) go(activePage, null);
-  document.getElementById('sbSaveStatus').textContent = '☁ Sincronizado';
-  toast('↻ Dados atualizados do servidor','ok');
-}
-
 function setV(id,v){const el=document.getElementById(id);if(el&&v!==undefined&&v!==null)el.value=v;}
 
 // ══ STREAK ══
@@ -3642,7 +3625,7 @@ function closeInputModal(action) {
 function closeModals(){document.getElementById('overlay').classList.remove('open');document.querySelectorAll('.modal').forEach(m=>m.classList.remove('open'));}
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){closeModals();closeMealDrawer();}
-  if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();forceSyncNow();}
+  if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();}
 });
 
 // ══ UTILS ══
