@@ -524,11 +524,10 @@ body.mobile-mode .taco-results{max-height:160px}
 
 <!-- SESSION BLOCKED -->
 <div class="session-screen" id="sessionScreen">
-  <div class="session-icon">🔒</div>
-  <div class="session-title">Outro dispositivo conectado</div>
-  <div class="session-msg" id="sessionMsg">Sua conta está ativa em outro dispositivo. Faça logout lá primeiro, ou tome controle desta sessão.</div>
-  <button class="session-btn" onclick="takeOverSession()">Entrar aqui (deslogar o outro)</button>
-  <button class="session-btn session-btn-s" onclick="logout()">Cancelar</button>
+  <div class="session-title">Conta em uso</div>
+  <div class="session-msg" id="sessionMsg">Sua conta está ativa em outro dispositivo.</div>
+  <button class="session-btn" onclick="takeOverSession()">Entrar neste dispositivo</button>
+  <button class="session-btn session-btn-s" onclick="logout()">Voltar ao login</button>
 </div>
 
 <!-- LOADING -->
@@ -1810,7 +1809,7 @@ async function registerSession() {
       // Sessão de outro dispositivo ativa — verifica se é recente (< 30min)
       const lastSeen = new Date(data.updated_at).getTime();
       const minutesAgo = (Date.now() - lastSeen) / 60000;
-      if (minutesAgo < 30) {
+      if (minutesAgo < 5) {
         // Bloqueia e mostra tela
         showSessionBlocked(data.device_info, minutesAgo);
         return false;
@@ -1838,6 +1837,8 @@ async function registerSession() {
 
 async function takeOverSession() {
   if (!sb || !currentUser) return;
+  document.getElementById('sessionScreen').classList.remove('show');
+  document.getElementById('loadingScreen').classList.add('show');
   try {
     await sb.from('active_sessions').upsert({
       user_id: currentUser.id,
@@ -1845,12 +1846,10 @@ async function takeOverSession() {
       device_info: getDeviceInfo(),
       updated_at: new Date().toISOString()
     }, { onConflict: 'user_id' });
-    document.getElementById('sessionScreen').classList.remove('show');
-    continueEnterApp();
   } catch(e) {
     console.warn('takeOverSession error:', e);
-    continueEnterApp(); // Tenta entrar mesmo assim
   }
+  await continueEnterApp(_pendingEmail, _pendingName);
 }
 
 function showSessionBlocked(deviceInfo, minutesAgo) {
@@ -1872,7 +1871,7 @@ function startSessionHeartbeat() {
     await sb.from('active_sessions').update({
       updated_at: new Date().toISOString()
     }).eq('user_id', currentUser.id).eq('session_id', SESSION_ID);
-  }, 120000); // 2 minutos
+  }, 60000); // 1 minuto
 }
 
 let _sessionChannel = null;
@@ -2049,15 +2048,19 @@ async function forgotPassword() {
   document.getElementById('forgotBtn').textContent = 'Esqueci minha senha';
 }
 
+let _pendingEmail = '';
+let _pendingName = '';
+
 async function enterApp(email, name) {
+  _pendingEmail = email || '';
+  _pendingName = name || '';
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('loadingScreen').classList.add('show');
 
-  // Verifica sessão única — bloqueia se outro dispositivo estiver ativo
   const canEnter = await registerSession();
   if (!canEnter) return;
 
-  await continueEnterApp(email, name);
+  await continueEnterApp(_pendingEmail, _pendingName);
 }
 
 async function continueEnterApp(email, name) {
@@ -3798,6 +3801,18 @@ function fmtDate(d){if(!d) return '';const[y,m,day]=d.split('-');return `${day}/
       if(session){currentUser=session.user;enterApp(session.user.email,session.user.user_metadata?.name||session.user.email.split('@')[0]);}
     });
   }
+
+  // Detecta quando aba fica invisível (minimizada, trocada, fechada)
+  // A sessão expira automaticamente após 5min sem heartbeat
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      // Para o heartbeat quando app vai para background
+      clearInterval(_heartbeatInterval);
+    } else if (document.visibilityState === 'visible' && currentUser) {
+      // Retoma heartbeat quando volta
+      startSessionHeartbeat();
+    }
+  });
 })();
 </script>
 <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});</script>
