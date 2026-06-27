@@ -114,6 +114,17 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--text);displa
 .auth-offline-btn{background:none;border:1px solid rgba(255,255,255,.1);color:#6b6660;font-family:'Syne',sans-serif;font-size:11px;padding:7px 14px;border-radius:8px;cursor:pointer;transition:all .14s}
 .auth-offline-btn:hover{border-color:#c8441a;color:#c8441a}
 
+/* ══ SESSION BLOCKED SCREEN ══ */
+.session-screen{position:fixed;inset:0;background:var(--sidebar-bg);display:none;align-items:center;justify-content:center;z-index:998;flex-direction:column;gap:16px;padding:24px;text-align:center}
+.session-screen.show{display:flex}
+.session-icon{font-size:48px;margin-bottom:8px}
+.session-title{font-size:20px;font-weight:800;color:#f4f1eb}
+.session-msg{font-size:13px;color:#6b6660;max-width:300px;line-height:1.6;font-family:'DM Mono',monospace}
+.session-btn{margin-top:8px;padding:12px 24px;border:none;border-radius:10px;background:#c8441a;color:white;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:background .14s}
+.session-btn:hover{background:#e85c2a}
+.session-btn-s{background:transparent;border:1px solid rgba(255,255,255,.15);color:#6b6660;margin-top:4px}
+.session-btn-s:hover{background:rgba(255,255,255,.05);color:#f4f1eb}
+
 /* ══ LOADING SCREEN ══ */
 .loading-screen{position:fixed;inset:0;background:var(--sidebar-bg);display:none;align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:16px}
 .loading-screen.show{display:flex}
@@ -510,6 +521,15 @@ body.mobile-mode .taco-results{max-height:160px}
 </div>
 
 <div class="mob-overlay" id="mobOverlay" onclick="closeMobMenu()"></div>
+
+<!-- SESSION BLOCKED -->
+<div class="session-screen" id="sessionScreen">
+  <div class="session-icon">🔒</div>
+  <div class="session-title">Outro dispositivo conectado</div>
+  <div class="session-msg" id="sessionMsg">Sua conta está ativa em outro dispositivo. Faça logout lá primeiro, ou tome controle desta sessão.</div>
+  <button class="session-btn" onclick="takeOverSession()">Entrar aqui (deslogar o outro)</button>
+  <button class="session-btn session-btn-s" onclick="logout()">Cancelar</button>
+</div>
 
 <!-- LOADING -->
 <div class="loading-screen" id="loadingScreen">
@@ -1776,6 +1796,139 @@ const SESSION_ID = Math.random().toString(36).slice(2);
 // Timestamp do último save local — eventos com updated_at anterior são ecos nossos
 let _lastSaveTs = 0;
 
+// ══ CONTROLE DE SESSÃO ÚNICA ══
+async function registerSession() {
+  if (!sb || !currentUser) return true;
+  try {
+    // Verifica se já existe sessão ativa de outro dispositivo
+    const { data } = await sb.from('active_sessions')
+      .select('session_id, device_info, updated_at')
+      .eq('user_id', currentUser.id)
+      .single();
+
+    if (data && data.session_id !== SESSION_ID) {
+      // Sessão de outro dispositivo ativa — verifica se é recente (< 30min)
+      const lastSeen = new Date(data.updated_at).getTime();
+      const minutesAgo = (Date.now() - lastSeen) / 60000;
+      if (minutesAgo < 30) {
+        // Bloqueia e mostra tela
+        showSessionBlocked(data.device_info, minutesAgo);
+        return false;
+      }
+    }
+
+    // Registra esta sessão como ativa
+    await sb.from('active_sessions').upsert({
+      user_id: currentUser.id,
+      session_id: SESSION_ID,
+      device_info: getDeviceInfo(),
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'user_id' });
+
+    // Inicia heartbeat para manter sessão viva
+    startSessionHeartbeat();
+    // Escuta se outro dispositivo toma a sessão
+    listenSessionTakeover();
+    return true;
+  } catch(e) {
+    console.warn('registerSession error:', e);
+    return true; // Em caso de erro, deixa entrar
+  }
+}
+
+async function takeOverSession() {
+  if (!sb || !currentUser) return;
+  try {
+    await sb.from('active_sessions').upsert({
+      user_id: currentUser.id,
+      session_id: SESSION_ID,
+      device_info: getDeviceInfo(),
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'user_id' });
+    document.getElementById('sessionScreen').classList.remove('show');
+    continueEnterApp();
+  } catch(e) {
+    console.warn('takeOverSession error:', e);
+    continueEnterApp(); // Tenta entrar mesmo assim
+  }
+}
+
+function showSessionBlocked(deviceInfo, minutesAgo) {
+  const min = Math.round(minutesAgo);
+  document.getElementById('sessionMsg').textContent =
+    `Sua conta está ativa em outro dispositivo${deviceInfo ? ' (' + deviceInfo + ')' : ''}` +
+    ` — ativo há ${min < 1 ? 'menos de 1 minuto' : min + ' minuto' + (min !== 1 ? 's' : '')}.` +
+    ` Clique em "Entrar aqui" para deslogar o outro dispositivo automaticamente.`;
+  document.getElementById('loadingScreen').classList.remove('show');
+  document.getElementById('sessionScreen').classList.add('show');
+}
+
+let _heartbeatInterval = null;
+function startSessionHeartbeat() {
+  // Atualiza updated_at a cada 2 minutos para manter sessão "viva"
+  clearInterval(_heartbeatInterval);
+  _heartbeatInterval = setInterval(async () => {
+    if (!sb || !currentUser) return;
+    await sb.from('active_sessions').update({
+      updated_at: new Date().toISOString()
+    }).eq('user_id', currentUser.id).eq('session_id', SESSION_ID);
+  }, 120000); // 2 minutos
+}
+
+let _sessionChannel = null;
+function listenSessionTakeover() {
+  if (!sb || !currentUser) return;
+  if (_sessionChannel) { sb.removeChannel(_sessionChannel); _sessionChannel = null; }
+
+  _sessionChannel = sb.channel('session-' + currentUser.id)
+    .on('postgres_changes', {
+      event: 'UPDATE', schema: 'public', table: 'active_sessions',
+      filter: `user_id=eq.${currentUser.id}`
+    }, (payload) => {
+      // Se session_id mudou, outro dispositivo tomou a sessão
+      if (payload.new.session_id !== SESSION_ID) {
+        clearInterval(_heartbeatInterval);
+        showForcedLogout();
+      }
+    })
+    .subscribe();
+}
+
+function showForcedLogout() {
+  // Outro dispositivo logou — mostra aviso e desloga
+  document.body.innerHTML = `
+    <div style="position:fixed;inset:0;background:#191714;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;padding:24px">
+      <div style="font-size:48px">📱</div>
+      <div style="font-size:20px;font-weight:800;color:#f4f1eb">Sessão encerrada</div>
+      <div style="font-size:13px;color:#6b6660;max-width:300px;line-height:1.6;font-family:'DM Mono',monospace">
+        Outro dispositivo entrou na sua conta e encerrou esta sessão.
+      </div>
+      <button onclick="location.reload()" style="margin-top:8px;padding:12px 24px;border:none;border-radius:10px;background:#c8441a;color:white;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer">
+        Recarregar
+      </button>
+    </div>`;
+}
+
+async function clearSession() {
+  if (!sb || !currentUser) return;
+  clearInterval(_heartbeatInterval);
+  if (_sessionChannel) { await sb.removeChannel(_sessionChannel); _sessionChannel = null; }
+  // Remove sessão só se for desta aba
+  await sb.from('active_sessions')
+    .delete()
+    .eq('user_id', currentUser.id)
+    .eq('session_id', SESSION_ID);
+}
+
+function getDeviceInfo() {
+  const ua = navigator.userAgent;
+  if (/iPhone|iPad|iPod/.test(ua)) return 'iOS';
+  if (/Android/.test(ua)) return 'Android';
+  if (/Windows/.test(ua)) return 'Windows';
+  if (/Mac/.test(ua)) return 'Mac';
+  return 'Outro';
+}
+
 async function initRealtime() {
   if (!sb || !currentUser) return;
   if (realtimeChannel) { await sb.removeChannel(realtimeChannel); realtimeChannel = null; }
@@ -1900,19 +2053,26 @@ async function enterApp(email, name) {
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('loadingScreen').classList.add('show');
 
-  // Carrega todos os dados do Supabase — fonte única de verdade
+  // Verifica sessão única — bloqueia se outro dispositivo estiver ativo
+  const canEnter = await registerSession();
+  if (!canEnter) return;
+
+  await continueEnterApp(email, name);
+}
+
+async function continueEnterApp(email, name) {
+  email = email || currentUser?.email || '';
+  name = name || email.split('@')[0];
+
   await dbLoadAll();
 
-  // Se é primeira vez (sem profile salvo), salva o nome inicial
-  if (!S.config.nome && name && name !== 'Usuário local') {
+  if (!S.config.nome && name) {
     S.config.nome = name;
     await dbSaveProfile();
   }
 
-  // Sincroniza variável local com o que veio do servidor
   cardapioAtivoDieta = S.protocolo.cardapioAtivoId || 'padrao';
 
-  // Aplica configurações carregadas
   applyTheme(S.theme||'default');
   setV('cfgNome',S.config.nome); setV('cfgPeso',S.config.peso); setV('cfgMeta',S.config.meta);
   setV('cfgKcal',S.config.kcalMeta||2000); setV('cfgProt',S.config.protMeta||160);
@@ -1922,6 +2082,7 @@ async function enterApp(email, name) {
   renderDaysEditGrid();
 
   document.getElementById('loadingScreen').classList.remove('show');
+  document.getElementById('sessionScreen').classList.remove('show');
   document.getElementById('sbUser').textContent = email;
   document.getElementById('cfgUserEmail').textContent = email;
   document.getElementById('sbSaveStatus').textContent = '☁ Sincronizado';
@@ -1931,6 +2092,7 @@ async function enterApp(email, name) {
 }
 
 async function logout() {
+  await clearSession();
   if (realtimeChannel && sb) { await sb.removeChannel(realtimeChannel); realtimeChannel = null; }
   if (sb) await sb.auth.signOut();
   currentUser = null;
