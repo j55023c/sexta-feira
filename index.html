@@ -1793,7 +1793,6 @@ let realtimeChannel = null;
 // ID único desta sessão/aba — usado para ignorar os próprios eventos
 const SESSION_ID = Math.random().toString(36).slice(2);
 // Timestamp do último save local — eventos com updated_at anterior são ecos nossos
-let _lastSaveTs = 0;
 
 // ══ CONTROLE DE SESSÃO ÚNICA ══
 async function registerSession() {
@@ -1894,18 +1893,19 @@ function listenSessionTakeover() {
 }
 
 function showForcedLogout() {
-  // Outro dispositivo logou — mostra aviso e desloga
-  document.body.innerHTML = `
-    <div style="position:fixed;inset:0;background:#191714;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;padding:24px">
-      <div style="font-size:48px">📱</div>
-      <div style="font-size:20px;font-weight:800;color:#f4f1eb">Sessão encerrada</div>
-      <div style="font-size:13px;color:#6b6660;max-width:300px;line-height:1.6;font-family:'DM Mono',monospace">
-        Outro dispositivo entrou na sua conta e encerrou esta sessão.
-      </div>
-      <button onclick="location.reload()" style="margin-top:8px;padding:12px 24px;border:none;border-radius:10px;background:#c8441a;color:white;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer">
-        Recarregar
-      </button>
-    </div>`;
+  clearInterval(_heartbeatInterval);
+  if (_sessionChannel && sb) { sb.removeChannel(_sessionChannel); _sessionChannel = null; }
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:#191714;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;padding:24px;z-index:9999';
+  overlay.innerHTML = `
+    <div style="font-size:20px;font-weight:800;color:#f4f1eb">Sessão encerrada</div>
+    <div style="font-size:13px;color:#6b6660;max-width:300px;line-height:1.6;font-family:'DM Mono',monospace">
+      Outro dispositivo entrou na sua conta.
+    </div>
+    <button onclick="location.reload()" style="margin-top:8px;padding:12px 24px;border:none;border-radius:10px;background:#c8441a;color:white;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer">
+      Recarregar
+    </button>`;
+  document.body.appendChild(overlay);
 }
 
 async function clearSession() {
@@ -1928,70 +1928,9 @@ function getDeviceInfo() {
   return 'Outro';
 }
 
-async function initRealtime() {
-  if (!sb || !currentUser) return;
-  if (realtimeChannel) { await sb.removeChannel(realtimeChannel); realtimeChannel = null; }
-
-  realtimeChannel = sb.channel('db-changes-' + currentUser.id)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'protocolo',      filter: `user_id=eq.${currentUser.id}` }, p => handleRemoteChange('protocolo', p))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'cardapios',      filter: `user_id=eq.${currentUser.id}` }, p => handleRemoteChange('cardapios', p))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'notas',          filter: `user_id=eq.${currentUser.id}` }, p => handleRemoteChange('notas', p))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'materias',       filter: `user_id=eq.${currentUser.id}` }, p => handleRemoteChange('materias', p))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'tarefas_livres', filter: `user_id=eq.${currentUser.id}` }, p => handleRemoteChange('tarefas', p))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'nut_log',        filter: `user_id=eq.${currentUser.id}` }, p => handleRemoteChange('nutlog', p))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'water_log',      filter: `user_id=eq.${currentUser.id}` }, p => handleRemoteChange('water', p))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'fisico_log',     filter: `user_id=eq.${currentUser.id}` }, p => handleRemoteChange('fisico', p))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles',       filter: `user_id=eq.${currentUser.id}` }, p => handleRemoteChange('profile', p))
-    .subscribe((status) => {
-      console.log('Realtime status:', status);
-    });
-}
-
-let _realtimeTimer = null;
-let _pendingChanges = new Set();
-
-function handleRemoteChange(type, payload) {
-  // Verifica se o evento veio de outro dispositivo comparando o timestamp
-  const eventTs = payload?.new?.updated_at ? new Date(payload.new.updated_at).getTime() : 0;
-  
-  // Se o evento tem timestamp igual ou anterior ao nosso último save, é eco — ignora
-  // Margem de 2s para diferenças de relógio entre dispositivos
-  if (eventTs > 0 && eventTs <= _lastSaveTs + 2000) {
-    console.log(`Realtime [${type}]: eco próprio ignorado`);
-    return;
-  }
-
-  console.log(`Realtime [${type}]: mudança de outro dispositivo detectada`);
-  _pendingChanges.add(type);
-  clearTimeout(_realtimeTimer);
-  _realtimeTimer = setTimeout(async () => {
-    const changes = new Set(_pendingChanges);
-    _pendingChanges.clear();
-    await applyRemoteChanges(changes);
-  }, 300);
-}
-
-async function applyRemoteChanges(changes) {
-  const loads = [];
-  if (changes.has('profile'))                                { loads.push(dbLoadProfile()); }
-  if (changes.has('protocolo') || changes.has('cardapios')) { loads.push(dbLoadProtocolo()); loads.push(dbLoadCardapios()); }
-  if (changes.has('notas'))                                  { loads.push(dbLoadNotas()); }
-  if (changes.has('materias') || changes.has('tarefas'))    { loads.push(dbLoadMaterias()); loads.push(dbLoadTarefas()); }
-  if (changes.has('nutlog'))                                 { loads.push(dbLoadNutLog()); }
-  if (changes.has('water'))                                  { loads.push(dbLoadWater()); }
-  if (changes.has('fisico'))                                 { loads.push(dbLoadFisico()); }
-  await Promise.all(loads);
-
-  // Re-renderiza a página ativa
-  const activePage = document.querySelector('.page.active')?.id?.replace('page-','');
-  if (activePage) {
-    if (changes.has('profile')) applyTheme(S.theme||'default');
-    const el = document.querySelector(`.nav-item[onclick*="'${activePage}'"]`);
-    go(activePage, el);
-  }
-  document.getElementById('sbSaveStatus').textContent = '☁ Sincronizado';
-  toast('↻ Atualizado de outro dispositivo','ok');
-}
+// Realtime de dados removido — sessão única garante que só um dispositivo escreve.
+// Dados são sempre carregados do servidor ao abrir o app (dbLoadAll no enterApp).
+function initRealtime() { /* no-op intencional */ }
 
 // ══ AUTH ══
 let authMode = 'login';
@@ -2096,7 +2035,6 @@ async function continueEnterApp(email, name) {
 
 async function logout() {
   await clearSession();
-  if (realtimeChannel && sb) { await sb.removeChannel(realtimeChannel); realtimeChannel = null; }
   if (sb) await sb.auth.signOut();
   currentUser = null;
   // Limpa estado em memória para não vazar dados entre contas
@@ -2370,7 +2308,6 @@ function dbErr(msg) {
 // ── PROFILES ──
 async function dbSaveProfile() {
   if (!sb||!currentUser) return;
-  _lastSaveTs = Date.now();
   const {error} = await sb.from('profiles').upsert({
     user_id: currentUser.id,
     nome: S.config.nome, peso: S.config.peso, meta_peso: S.config.meta,
@@ -2399,7 +2336,6 @@ async function dbLoadProfile() {
 // ── PROTOCOLO ──
 async function dbSaveProtocolo() {
   if (!sb||!currentUser) return;
-  _lastSaveTs = Date.now();
   const p = S.protocolo;
   const {error} = await sb.from('protocolo').upsert({
     user_id: currentUser.id,
@@ -2426,7 +2362,6 @@ async function dbLoadProtocolo() {
 // ── CARDÁPIOS ──
 async function dbSaveCardapio(c) {
   if (!sb||!currentUser) return;
-  _lastSaveTs = Date.now();
   const {error} = await sb.from('cardapios').upsert({
     id: c.id, user_id: currentUser.id, nome: c.nome,
     objetivo: c.objetivo, built_in: c.built_in||false,
@@ -2436,7 +2371,6 @@ async function dbSaveCardapio(c) {
 }
 async function dbDeleteCardapio(id) {
   if (!sb||!currentUser) return;
-  _lastSaveTs = Date.now();
   const {error} = await sb.from('cardapios').delete().eq('id',id).eq('user_id',currentUser.id);
   if (error) dbErr(error.message);
 }
@@ -2452,7 +2386,6 @@ async function dbLoadCardapios() {
 // ── NOTAS ──
 async function dbSaveNota(n) {
   if (!sb||!currentUser) return;
-  _lastSaveTs = Date.now();
   const {error} = await sb.from('notas').upsert({
     id: n.id, user_id: currentUser.id, title: n.title||'',
     body: n.body||'', tag: n.tag||'geral', date: n.date||TODAY,
@@ -2462,7 +2395,6 @@ async function dbSaveNota(n) {
 }
 async function dbDeleteNota(id) {
   if (!sb||!currentUser) return;
-  _lastSaveTs = Date.now();
   const {error} = await sb.from('notas').delete().eq('id',id).eq('user_id',currentUser.id);
   if (error) dbErr(error.message);
 }
@@ -2476,7 +2408,6 @@ async function dbLoadNotas() {
 // ── MATÉRIAS ──
 async function dbSaveMateria(m) {
   if (!sb||!currentUser) return;
-  _lastSaveTs = Date.now();
   const {error} = await sb.from('materias').upsert({
     id: m.id, user_id: currentUser.id, nome: m.nome,
     tag: m.tag||'senai', prazo: m.prazo||'', tasks: m.tasks||[],
@@ -2486,7 +2417,6 @@ async function dbSaveMateria(m) {
 }
 async function dbDeleteMateria(id) {
   if (!sb||!currentUser) return;
-  _lastSaveTs = Date.now();
   const {error} = await sb.from('materias').delete().eq('id',id).eq('user_id',currentUser.id);
   if (error) dbErr(error.message);
 }
@@ -2500,7 +2430,6 @@ async function dbLoadMaterias() {
 // ── TAREFAS LIVRES ──
 async function dbSaveTarefa(t) {
   if (!sb||!currentUser) return;
-  _lastSaveTs = Date.now();
   const {error} = await sb.from('tarefas_livres').upsert({
     id: t.id, user_id: currentUser.id, nome: t.nome,
     tag: t.tag||'pessoal', done: t.done||false, prazo: t.prazo||'',
@@ -2510,7 +2439,6 @@ async function dbSaveTarefa(t) {
 }
 async function dbDeleteTarefa(id) {
   if (!sb||!currentUser) return;
-  _lastSaveTs = Date.now();
   const {error} = await sb.from('tarefas_livres').delete().eq('id',id).eq('user_id',currentUser.id);
   if (error) dbErr(error.message);
 }
@@ -2524,7 +2452,6 @@ async function dbLoadTarefas() {
 // ── NUT LOG ──
 async function dbSaveNutLog(date) {
   if (!sb||!currentUser) return;
-  _lastSaveTs = Date.now();
   const d = date || TODAY;
   const {error} = await sb.from('nut_log').upsert({
     user_id: currentUser.id, date: d, entries: S.nutLog[d]||[],
@@ -2543,7 +2470,6 @@ async function dbLoadNutLog() {
 // ── WATER LOG ──
 async function dbSaveWater() {
   if (!sb||!currentUser) return;
-  _lastSaveTs = Date.now();
   const {error} = await sb.from('water_log').upsert({
     user_id: currentUser.id, date: TODAY, ml: S.waterLog[TODAY]||0,
     updated_at: new Date().toISOString()
@@ -2561,7 +2487,6 @@ async function dbLoadWater() {
 // ── FÍSICO LOG ──
 async function dbSaveFisicoDate(date, l) {
   if (!sb||!currentUser) return;
-  _lastSaveTs = Date.now();
   const {error} = await sb.from('fisico_log').upsert({
     user_id: currentUser.id, date: date,
     peso: l.peso||null, altura: l.altura||null,
@@ -2575,7 +2500,6 @@ async function dbSaveFisicoDate(date, l) {
 }
 async function dbSaveFisico() {
   if (!sb||!currentUser) return;
-  _lastSaveTs = Date.now();
   const l = S.fisicoLog[TODAY]||{};
   const {error} = await sb.from('fisico_log').upsert({
     user_id: currentUser.id, date: TODAY,
@@ -2603,7 +2527,6 @@ async function dbLoadFisico() {
 // ── HISTÓRICO DE FASES ──
 async function dbSaveHistoricoFase(h) {
   if (!sb||!currentUser) return;
-  _lastSaveTs = Date.now();
   await sb.from('historico_fases').insert({
     user_id: currentUser.id, fase: h.fase, nome: h.nome,
     data_inicio: h.dataInicio, data_fim: h.dataFim,
