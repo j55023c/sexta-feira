@@ -1,11 +1,22 @@
-// Placeholder — o componente de login será construído no próximo ciclo
+// Server Component — não precisa de 'use client'.
+// Apenas monta o layout da tela de login e injeta o AuthForm.
+// O middleware já garante que usuários logados nunca chegam aqui.
+
+import AuthForm from './AuthForm'
+
 export default function AuthPage() {
   return (
-    <main className="min-h-screen flex items-center justify-center" style={{ background: 'var(--sidebar-bg)' }}>
-      <div className="text-center" style={{ color: 'var(--sidebar-text)' }}>
-        <h1 className="text-2xl font-bold mb-2">Sexta-<span style={{ color: 'var(--accent)' }}>feira</span></h1>
-        <p className="text-sm opacity-50">Página de login — em construção</p>
-      </div>
+    <main
+      style={{
+        minHeight: '100vh',
+        background: '#191714',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+      }}
+    >
+      <AuthForm />
     </main>
   )
 }
