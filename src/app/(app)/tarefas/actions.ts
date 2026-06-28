@@ -2,155 +2,163 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { dbSaveMateria, dbDeleteMateria, dbSaveTarefa, dbDeleteTarefa } from '@/lib/db'
 import type { TagTarefa } from '@/lib/types'
+
+// Todas as actions usam createServer() — rodam no servidor, têm sessão via cookie.
+// As queries vão direto ao Supabase sem passar pelo client browser.
+
+async function getUser() {
+  const sb = await createClient()
+  const { data: { user } } = await sb.auth.getUser()
+  return { sb, user }
+}
 
 // ── MATÉRIAS ──────────────────────────────────────────────────────────────────
 
 export async function actionAddMateria(formData: FormData) {
-  const sb = await createClient()
-  const { data: { user } } = await sb.auth.getUser()
+  const { sb, user } = await getUser()
   if (!user) return { error: 'Não autenticado' }
 
   const tasksRaw = (formData.get('tasks') as string ?? '').trim()
   const materia = {
     id: Date.now(),
+    user_id: user.id,
     nome: formData.get('nome') as string,
     tag: formData.get('tag') as TagTarefa,
     prazo: formData.get('prazo') as string ?? '',
     tasks: tasksRaw
-      ? tasksRaw.split('\n').filter(Boolean).map(s => ({
-          id: Date.now() + Math.random(),
+      ? tasksRaw.split('\n').filter(Boolean).map((s, i) => ({
+          id: Date.now() + i,
           nome: s.trim(),
           done: false,
           prazo: '',
         }))
       : [],
+    updated_at: new Date().toISOString(),
   }
 
-  try {
-    await dbSaveMateria(user.id, materia)
-    revalidatePath('/tarefas')
-    revalidatePath('/home')
-  } catch (e: unknown) {
-    return { error: e instanceof Error ? e.message : 'Erro ao salvar' }
-  }
+  const { error } = await sb.from('materias').upsert(materia, { onConflict: 'id,user_id' })
+  if (error) return { error: error.message }
+
+  revalidatePath('/tarefas')
+  revalidatePath('/home')
 }
 
 export async function actionDeleteMateria(materiaId: number) {
-  const sb = await createClient()
-  const { data: { user } } = await sb.auth.getUser()
+  const { sb, user } = await getUser()
   if (!user) return { error: 'Não autenticado' }
 
-  try {
-    await dbDeleteMateria(user.id, materiaId)
-    revalidatePath('/tarefas')
-    revalidatePath('/home')
-  } catch (e: unknown) {
-    return { error: e instanceof Error ? e.message : 'Erro ao deletar' }
-  }
+  const { error } = await sb.from('materias').delete().eq('id', materiaId).eq('user_id', user.id)
+  if (error) return { error: error.message }
+
+  revalidatePath('/tarefas')
+  revalidatePath('/home')
 }
 
-export async function actionToggleTask(materiaId: number, tasks: { id: number; nome: string; done: boolean; prazo: string }[]) {
-  const sb = await createClient()
-  const { data: { user } } = await sb.auth.getUser()
+export async function actionToggleTask(
+  materiaId: number,
+  tasks: { id: number; nome: string; done: boolean; prazo: string }[]
+) {
+  const { sb, user } = await getUser()
   if (!user) return { error: 'Não autenticado' }
 
-  // Busca matéria atual e atualiza só as tasks
-  const { data } = await sb.from('materias').select('*').eq('id', materiaId).eq('user_id', user.id).single()
-  if (!data) return { error: 'Matéria não encontrada' }
+  const { error } = await sb
+    .from('materias')
+    .update({ tasks, updated_at: new Date().toISOString() })
+    .eq('id', materiaId)
+    .eq('user_id', user.id)
 
-  try {
-    await dbSaveMateria(user.id, { ...data, tasks })
-    revalidatePath('/tarefas')
-    revalidatePath('/home')
-  } catch (e: unknown) {
-    return { error: e instanceof Error ? e.message : 'Erro ao salvar' }
-  }
+  if (error) return { error: error.message }
+
+  revalidatePath('/tarefas')
+  revalidatePath('/home')
 }
 
-export async function actionAddTaskInline(materiaId: number, nomeTarefa: string, currentTasks: { id: number; nome: string; done: boolean; prazo: string }[]) {
-  const sb = await createClient()
-  const { data: { user } } = await sb.auth.getUser()
+export async function actionAddTaskInline(
+  materiaId: number,
+  nomeTarefa: string,
+  currentTasks: { id: number; nome: string; done: boolean; prazo: string }[]
+) {
+  const { sb, user } = await getUser()
   if (!user) return { error: 'Não autenticado' }
-
-  const { data } = await sb.from('materias').select('*').eq('id', materiaId).eq('user_id', user.id).single()
-  if (!data) return { error: 'Matéria não encontrada' }
 
   const novasTasks = [...currentTasks, { id: Date.now(), nome: nomeTarefa, done: false, prazo: '' }]
 
-  try {
-    await dbSaveMateria(user.id, { ...data, tasks: novasTasks })
-    revalidatePath('/tarefas')
-  } catch (e: unknown) {
-    return { error: e instanceof Error ? e.message : 'Erro ao salvar' }
-  }
+  const { error } = await sb
+    .from('materias')
+    .update({ tasks: novasTasks, updated_at: new Date().toISOString() })
+    .eq('id', materiaId)
+    .eq('user_id', user.id)
+
+  if (error) return { error: error.message }
+  revalidatePath('/tarefas')
 }
 
-export async function actionDeleteTask(materiaId: number, tasks: { id: number; nome: string; done: boolean; prazo: string }[]) {
-  const sb = await createClient()
-  const { data: { user } } = await sb.auth.getUser()
+export async function actionDeleteTask(
+  materiaId: number,
+  tasks: { id: number; nome: string; done: boolean; prazo: string }[]
+) {
+  const { sb, user } = await getUser()
   if (!user) return { error: 'Não autenticado' }
 
-  const { data } = await sb.from('materias').select('*').eq('id', materiaId).eq('user_id', user.id).single()
-  if (!data) return { error: 'Matéria não encontrada' }
+  const { error } = await sb
+    .from('materias')
+    .update({ tasks, updated_at: new Date().toISOString() })
+    .eq('id', materiaId)
+    .eq('user_id', user.id)
 
-  try {
-    await dbSaveMateria(user.id, { ...data, tasks })
-    revalidatePath('/tarefas')
-  } catch (e: unknown) {
-    return { error: e instanceof Error ? e.message : 'Erro ao salvar' }
-  }
+  if (error) return { error: error.message }
+  revalidatePath('/tarefas')
 }
 
 // ── TAREFAS LIVRES ────────────────────────────────────────────────────────────
 
 export async function actionAddTarefa(formData: FormData) {
-  const sb = await createClient()
-  const { data: { user } } = await sb.auth.getUser()
+  const { sb, user } = await getUser()
   if (!user) return { error: 'Não autenticado' }
 
   const tarefa = {
     id: Date.now(),
+    user_id: user.id,
     nome: formData.get('nome') as string,
     tag: formData.get('tag') as TagTarefa,
     done: false,
     prazo: formData.get('prazo') as string ?? '',
+    updated_at: new Date().toISOString(),
   }
 
-  try {
-    await dbSaveTarefa(user.id, tarefa)
-    revalidatePath('/tarefas')
-    revalidatePath('/home')
-  } catch (e: unknown) {
-    return { error: e instanceof Error ? e.message : 'Erro ao salvar' }
-  }
+  const { error } = await sb.from('tarefas_livres').upsert(tarefa, { onConflict: 'id,user_id' })
+  if (error) return { error: error.message }
+
+  revalidatePath('/tarefas')
+  revalidatePath('/home')
 }
 
-export async function actionToggleTarefa(tarefa: { id: number; nome: string; tag: TagTarefa; done: boolean; prazo: string }) {
-  const sb = await createClient()
-  const { data: { user } } = await sb.auth.getUser()
+export async function actionToggleTarefa(tarefa: {
+  id: number; nome: string; tag: TagTarefa; done: boolean; prazo: string
+}) {
+  const { sb, user } = await getUser()
   if (!user) return { error: 'Não autenticado' }
 
-  try {
-    await dbSaveTarefa(user.id, { ...tarefa, done: !tarefa.done })
-    revalidatePath('/tarefas')
-    revalidatePath('/home')
-  } catch (e: unknown) {
-    return { error: e instanceof Error ? e.message : 'Erro ao salvar' }
-  }
+  const { error } = await sb
+    .from('tarefas_livres')
+    .update({ done: !tarefa.done, updated_at: new Date().toISOString() })
+    .eq('id', tarefa.id)
+    .eq('user_id', user.id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/tarefas')
+  revalidatePath('/home')
 }
 
 export async function actionDeleteTarefa(tarefaId: number) {
-  const sb = await createClient()
-  const { data: { user } } = await sb.auth.getUser()
+  const { sb, user } = await getUser()
   if (!user) return { error: 'Não autenticado' }
 
-  try {
-    await dbDeleteTarefa(user.id, tarefaId)
-    revalidatePath('/tarefas')
-    revalidatePath('/home')
-  } catch (e: unknown) {
-    return { error: e instanceof Error ? e.message : 'Erro ao salvar' }
-  }
+  const { error } = await sb.from('tarefas_livres').delete().eq('id', tarefaId).eq('user_id', user.id)
+  if (error) return { error: error.message }
+
+  revalidatePath('/tarefas')
+  revalidatePath('/home')
 }
