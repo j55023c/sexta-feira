@@ -1,10 +1,13 @@
-export default function NotasPage() {
-  return (
-    <div>
-      <h1 style={{ fontSize: 21, fontWeight: 800, marginBottom: 3, color: 'var(--text)' }}>
-        Notas
-      </h1>
-      <p style={{ color: 'var(--muted)', fontSize: 13 }}>Em migração...</p>
-    </div>
-  )
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
+import { dbLoadNotas } from '@/lib/db'
+import NotasClient from './NotasClient'
+
+export default async function NotasPage() {
+  const sb = await createClient()
+  const { data: { user } } = await sb.auth.getUser()
+  if (!user) redirect('/auth')
+
+  const notas = await dbLoadNotas(user.id)
+  return <NotasClient notas={notas} />
 }

@@ -5,20 +5,13 @@ import type { Profile, Protocolo, Materia, TarefaLivre, FisicoLog } from '@/lib/
 
 const TODAY = new Date().toISOString().split('T')[0]
 const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
-const DIAS_FULL = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
-
-function fmtDate(d: string) {
-  if (!d) return ''
-  const [, m, day] = d.split('-')
-  return `${day}/${m}`
-}
 
 function tagStyle(t: string): React.CSSProperties {
   const tl = t.toLowerCase()
   if (tl.includes('cárdio') || tl.includes('cardio')) return { background: 'var(--amber-bg)', color: 'var(--amber)' }
   if (tl.includes('abs') || tl.includes('core')) return { background: 'var(--purple-bg)', color: 'var(--purple)' }
-  if (tl.includes('descanso') || tl.includes('livre')) return { background: 'rgba(255,255,255,.1)', color: 'rgba(255,255,255,.6)' }
+  if (tl.includes('descanso') || tl.includes('livre')) return { background: 'rgba(255,255,255,.12)', color: 'rgba(255,255,255,.7)' }
   return { background: 'var(--blue-bg)', color: 'var(--blue)' }
 }
 
@@ -68,38 +61,45 @@ export default function HomeClient({ profile, protocolo, materias, tarefasLivres
 
       {/* Coluna esquerda */}
       <div>
-        {/* Card hoje */}
+        {/* Card hoje — fundo escuro, círculo decorativo, idêntico ao original */}
         <div style={{
-          background: 'var(--inverse-bg)', color: 'var(--inverse-text)',
-          borderRadius: 'var(--radius-lg)', padding: '18px 20px',
-          marginBottom: 14, position: 'relative', overflow: 'hidden',
+          background: 'var(--inverse-bg)',
+          color: 'var(--inverse-text)',
+          borderRadius: 'var(--radius-lg)',
+          padding: '18px 20px',
+          marginBottom: 14,
+          position: 'relative',
+          overflow: 'hidden',
         }}>
-          {/* Círculo decorativo — menor e mais sutil */}
+          {/* Círculo decorativo */}
           <div style={{
-            position: 'absolute', top: -30, right: -30,
-            width: 120, height: 120, borderRadius: '50%',
-            border: '28px solid rgba(200,68,26,.12)', pointerEvents: 'none',
+            position: 'absolute', top: -40, right: -40,
+            width: 180, height: 180, borderRadius: '50%',
+            border: '40px solid rgba(200,68,26,.15)',
+            pointerEvents: 'none',
           }} />
 
-          <div style={{ fontSize: 9, letterSpacing: 2, textTransform: 'uppercase', color: 'var(--accent2)', fontWeight: 700, marginBottom: 4 }}>
-            Hoje · {DIAS[dow]}
-          </div>
-          <h3 style={{ fontSize: 20, fontWeight: 800, lineHeight: 1.2, marginBottom: 8 }}>
-            {diaProtocolo?.nome ?? '—'}
-          </h3>
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <div style={{ fontSize: 9, letterSpacing: 2, textTransform: 'uppercase', color: 'var(--accent2)', fontWeight: 700, marginBottom: 4 }}>
+              Hoje · {DIAS[dow]}
+            </div>
+            <h3 style={{ fontSize: 20, fontWeight: 800, lineHeight: 1.2, marginBottom: 8, color: 'var(--inverse-text)' }}>
+              {diaProtocolo?.nome ?? '—'}
+            </h3>
 
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 10 }}>
-            {diaProtocolo?.tags.map(t => (
-              <span key={t} style={{ ...tag, ...tagStyle(t) }}>{t}</span>
-            ))}
-          </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 10 }}>
+              {diaProtocolo?.tags.map(t => (
+                <span key={t} style={{ ...tag, ...tagStyle(t) }}>{t}</span>
+              ))}
+            </div>
 
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 5,
-            background: 'rgba(200,68,26,.2)', border: '1px solid rgba(200,68,26,.3)',
-            borderRadius: 999, padding: '3px 10px', fontSize: 12, fontWeight: 700, color: 'var(--accent2)',
-          }}>
-            🔥 {profile?.streak_count ?? 0} dia{profile?.streak_count !== 1 ? 's' : ''}
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              background: 'rgba(200,68,26,.2)', border: '1px solid rgba(200,68,26,.3)',
+              borderRadius: 999, padding: '3px 10px', fontSize: 12, fontWeight: 700, color: 'var(--accent2)',
+            }}>
+              🔥 {profile?.streak_count ?? 0} dia{profile?.streak_count !== 1 ? 's' : ''}
+            </div>
           </div>
         </div>
 
@@ -112,11 +112,11 @@ export default function HomeClient({ profile, protocolo, materias, tarefasLivres
               {pendentes.slice(0, 5).map((it, i) => (
                 <div key={i} style={{
                   display: 'flex', alignItems: 'center', gap: 9,
-                  padding: '7px 10px', background: 'var(--surface2)',
+                  padding: '7px 10px', background: 'var(--surface)',
                   border: '1px solid var(--border)', borderRadius: 'var(--radius)',
                   fontSize: 13, marginBottom: 5,
                 }}>
-                  <div style={{ width: 14, height: 14, flexShrink: 0, border: '2px solid var(--border2)', borderRadius: 3, background: 'var(--surface)' }} />
+                  <div style={{ width: 14, height: 14, flexShrink: 0, border: '2px solid var(--border2)', borderRadius: 3 }} />
                   <span style={{ flex: 1 }}>{it.nome}</span>
                   <span style={{ fontSize: 10, color: 'var(--muted)' }}>{it.src}</span>
                 </div>
@@ -152,7 +152,6 @@ export default function HomeClient({ profile, protocolo, materias, tarefasLivres
 
       {/* Coluna direita */}
       <div>
-        {/* Protocolo ativo */}
         <div style={{ ...card, marginBottom: 14 }}>
           <Divider label="Protocolo ativo" />
           <strong style={{ fontSize: 13, color: 'var(--text)', display: 'block', marginBottom: 4 }}>{protocolo?.nome ?? '—'}</strong>
@@ -160,7 +159,6 @@ export default function HomeClient({ profile, protocolo, materias, tarefasLivres
           {protocolo?.cardio && <span style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginTop: 8 }}>{protocolo.cardio}</span>}
         </div>
 
-        {/* Matérias com prazo */}
         <div style={card}>
           <Divider label="Matérias com prazo" />
           {comPrazo.length === 0
