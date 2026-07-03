@@ -1,10 +1,19 @@
-export default function CalculadoraPage() {
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
+import { dbLoadProfile } from '@/lib/db'
+import ConfiguracoesClient from './ConfiguracoesClient'
+
+export default async function ConfiguracoesPage() {
+  const sb = await createClient()
+  const { data: { user } } = await sb.auth.getUser()
+  if (!user) redirect('/auth')
+
+  const profile = await dbLoadProfile(user.id)
+
   return (
-    <div>
-      <h1 style={{ fontSize: 21, fontWeight: 800, marginBottom: 3, color: 'var(--text)' }}>
-        Calculadora
-      </h1>
-      <p style={{ color: 'var(--muted)', fontSize: 13 }}>Em migração...</p>
-    </div>
+    <ConfiguracoesClient
+      profile={profile}
+      userEmail={user.email ?? ''}
+    />
   )
 }
