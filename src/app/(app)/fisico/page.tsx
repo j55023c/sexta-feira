@@ -1,10 +1,22 @@
-export default function FisicoPage() {
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
+import { dbLoadFisico, dbLoadProfile } from '@/lib/db'
+import FisicoClient from './FisicoClient'
+
+export default async function FisicoPage() {
+  const sb = await createClient()
+  const { data: { user } } = await sb.auth.getUser()
+  if (!user) redirect('/auth')
+
+  const [fisicoLog, profile] = await Promise.all([
+    dbLoadFisico(user.id),
+    dbLoadProfile(user.id),
+  ])
+
   return (
-    <div>
-      <h1 style={{ fontSize: 21, fontWeight: 800, marginBottom: 3, color: 'var(--text)' }}>
-        Físico
-      </h1>
-      <p style={{ color: 'var(--muted)', fontSize: 13 }}>Em migração...</p>
-    </div>
+    <FisicoClient
+      fisicoLog={fisicoLog}
+      profile={profile}
+    />
   )
 }
