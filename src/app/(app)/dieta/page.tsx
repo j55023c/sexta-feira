@@ -1,10 +1,24 @@
-export default function DietaPage() {
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
+import { dbLoadCardapios, dbLoadProtocolo, dbLoadProfile } from '@/lib/db'
+import DietaClient from './DietaClient'
+
+export default async function DietaPage() {
+  const sb = await createClient()
+  const { data: { user } } = await sb.auth.getUser()
+  if (!user) redirect('/auth')
+
+  const [cardapios, protocolo, profile] = await Promise.all([
+    dbLoadCardapios(user.id),
+    dbLoadProtocolo(user.id),
+    dbLoadProfile(user.id),
+  ])
+
   return (
-    <div>
-      <h1 style={{ fontSize: 21, fontWeight: 800, marginBottom: 3, color: 'var(--text)' }}>
-        Dieta
-      </h1>
-      <p style={{ color: 'var(--muted)', fontSize: 13 }}>Em migração...</p>
-    </div>
+    <DietaClient
+      cardapios={cardapios}
+      protocolo={protocolo}
+      profile={profile}
+    />
   )
 }
