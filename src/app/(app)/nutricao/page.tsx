@@ -1,10 +1,22 @@
-export default function NutricaoPage() {
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
+import { dbLoadNutLog, dbLoadProfile } from '@/lib/db'
+import NutricaoClient from './NutricaoClient'
+
+export default async function NutricaoPage() {
+  const sb = await createClient()
+  const { data: { user } } = await sb.auth.getUser()
+  if (!user) redirect('/auth')
+
+  const [nutLog, profile] = await Promise.all([
+    dbLoadNutLog(user.id),
+    dbLoadProfile(user.id),
+  ])
+
   return (
-    <div>
-      <h1 style={{ fontSize: 21, fontWeight: 800, marginBottom: 3, color: 'var(--text)' }}>
-        Nutrição
-      </h1>
-      <p style={{ color: 'var(--muted)', fontSize: 13 }}>Em migração...</p>
-    </div>
+    <NutricaoClient
+      nutLog={nutLog}
+      profile={profile}
+    />
   )
 }
