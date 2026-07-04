@@ -237,8 +237,6 @@ export default function CalculadoraClient({ profile, fisicoLog }: Props) {
         prot_meta:  resultado.prot,
         carbo_meta: resultado.carb,
         gord_meta:  resultado.fat,
-        fase:       resultado.fase,
-        peso:       resultado.peso,
         ...(resultado.metaPeso ? { meta_peso: resultado.metaPeso } : {}),
       })
       if (!result?.error) {
