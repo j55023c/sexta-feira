@@ -1,24 +1,12 @@
 'use client'
 
 import { useState, useTransition, useEffect } from 'react'
-import type { Profile } from '@/lib/types'
-import { actionSalvarPerfil, actionSalvarTema, actionLogout } from './actions'
-
-// ── Tipos ─────────────────────────────────────────────────────────────────────
-
-type ThemeKey = 'default' | 'dark' | 'midnight' | 'forest' | 'rose'
-
-interface NotifConfig {
-  cafe:   string
-  pre:    string
-  pos:    string
-  jantar: string
-  fisico: string
-}
+import type { Profile, Theme, NotifTimes } from '@/lib/types'
+import { actionSalvarPerfil, actionSalvarTema, actionSalvarNotif, actionLogout } from './actions'
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
-const THEMES: { key: ThemeKey; label: string; gradient: string }[] = [
+const THEMES: { key: Theme; label: string; gradient: string }[] = [
   { key: 'default',  label: 'Bege (padrão)', gradient: 'linear-gradient(135deg,#f4f1eb,#c8441a)' },
   { key: 'dark',     label: 'Dark',          gradient: 'linear-gradient(135deg,#111010,#c8441a)' },
   { key: 'midnight', label: 'Midnight',      gradient: 'linear-gradient(135deg,#0a0e1a,#4a90d9)' },
@@ -26,7 +14,7 @@ const THEMES: { key: ThemeKey; label: string; gradient: string }[] = [
   { key: 'rose',     label: 'Rose',          gradient: 'linear-gradient(135deg,#fdf0f3,#c02060)' },
 ]
 
-const DEFAULT_NOTIF: NotifConfig = {
+const DEFAULT_NOTIF: NotifTimes = {
   cafe:   '07:30',
   pre:    '17:30',
   pos:    '19:30',
@@ -34,12 +22,12 @@ const DEFAULT_NOTIF: NotifConfig = {
   fisico: '21:00',
 }
 
-const NOTIF_LABELS: { key: keyof NotifConfig; label: string }[] = [
-  { key: 'cafe',   label: '☀️ Café da manhã' },
-  { key: 'pre',    label: '⚡ Pré-treino'     },
-  { key: 'pos',    label: '💪 Pós-treino'     },
-  { key: 'jantar', label: '🌙 Jantar'         },
-  { key: 'fisico', label: '📝 Registrar físico'},
+const NOTIF_LABELS: { key: keyof NotifTimes; label: string }[] = [
+  { key: 'cafe',   label: '☀️ Café da manhã'   },
+  { key: 'pre',    label: '⚡ Pré-treino'       },
+  { key: 'pos',    label: '💪 Pós-treino'       },
+  { key: 'jantar', label: '🌙 Jantar'           },
+  { key: 'fisico', label: '📝 Registrar físico' },
 ]
 
 // ── Estilos utilitários ───────────────────────────────────────────────────────
@@ -122,40 +110,35 @@ export default function ConfiguracoesClient({ profile, userEmail }: Props) {
   const [metaPeso, setMetaPeso] = useState(profile?.meta_peso?.toString() ?? '')
   const [savedPerfil, setSavedPerfil] = useState(false)
 
-  // Tema
-  const [activeTheme, setActiveTheme] = useState<ThemeKey>(
-    (profile?.theme as ThemeKey) ?? 'default'
-  )
+  // Tema — usa campo `tema` do Profile (tipo Theme)
+  const [activeTheme, setActiveTheme] = useState<Theme>(profile?.tema ?? 'default')
 
-  // Lembretes
-  const [notif, setNotif] = useState<NotifConfig>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const stored = localStorage.getItem('sf_notif')
-        return stored ? { ...DEFAULT_NOTIF, ...JSON.parse(stored) } : DEFAULT_NOTIF
-      } catch { return DEFAULT_NOTIF }
-    }
-    return DEFAULT_NOTIF
-  })
+  // Lembretes — lidos do Profile, fallback para defaults
+  const [notif, setNotif] = useState<NotifTimes>(
+    profile?.notif_times ?? DEFAULT_NOTIF
+  )
   const [notifPermission, setNotifPermission] = useState<NotificationPermission>('default')
   const [savedNotif, setSavedNotif] = useState(false)
 
   const [isPending, startTransition] = useTransition()
   const [confirmClear, setConfirmClear] = useState(false)
 
-  // Inicializa permissão de notificação
   useEffect(() => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       setNotifPermission(Notification.permission)
     }
-  }, [])
+    // Aplica o tema salvo no html ao montar
+    if (profile?.tema) {
+      document.documentElement.setAttribute('data-theme', profile.tema)
+    }
+  }, [profile?.tema])
 
   // ── Tema ──────────────────────────────────────────────────────────────────
 
-  function handleSetTheme(theme: ThemeKey) {
-    setActiveTheme(theme)
-    document.documentElement.setAttribute('data-theme', theme)
-    startTransition(async () => { await actionSalvarTema(theme) })
+  function handleSetTheme(tema: Theme) {
+    setActiveTheme(tema)
+    document.documentElement.setAttribute('data-theme', tema)
+    startTransition(async () => { await actionSalvarTema(tema) })
   }
 
   // ── Perfil ────────────────────────────────────────────────────────────────
@@ -164,7 +147,7 @@ export default function ConfiguracoesClient({ profile, userEmail }: Props) {
     setSavedPerfil(false)
     startTransition(async () => {
       const result = await actionSalvarPerfil({
-        nome:      nome || null,
+        nome:      nome || '',
         peso:      peso ? parseFloat(peso) : null,
         meta_peso: metaPeso ? parseFloat(metaPeso) : null,
       })
@@ -181,9 +164,11 @@ export default function ConfiguracoesClient({ profile, userEmail }: Props) {
   }
 
   function handleSaveNotif() {
-    localStorage.setItem('sf_notif', JSON.stringify(notif))
-    setSavedNotif(true)
-    setTimeout(() => setSavedNotif(false), 2500)
+    setSavedNotif(false)
+    startTransition(async () => {
+      const result = await actionSalvarNotif(notif)
+      if (!result?.error) setSavedNotif(true)
+    })
   }
 
   // ── Logout ────────────────────────────────────────────────────────────────
@@ -245,10 +230,7 @@ export default function ConfiguracoesClient({ profile, userEmail }: Props) {
           />
         </CfgRow>
 
-        <CfgRow
-          label="Kcal e proteína"
-          desc="Defina na aba Calculadora →"
-        />
+        <CfgRow label="Kcal e proteína" desc="Defina na aba Calculadora →" />
 
         <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
           <button onClick={handleSalvarPerfil} disabled={isPending} style={btnP}>
@@ -275,9 +257,7 @@ export default function ConfiguracoesClient({ profile, userEmail }: Props) {
                 style={{
                   width: 32, height: 32, borderRadius: '50%',
                   background: t.gradient,
-                  border: activeTheme === t.key
-                    ? '3px solid var(--accent)'
-                    : '3px solid transparent',
+                  border: activeTheme === t.key ? '3px solid var(--accent)' : '3px solid transparent',
                   cursor: 'pointer',
                   outline: activeTheme === t.key ? '2px solid var(--surface)' : 'none',
                   outlineOffset: -5,
@@ -317,7 +297,7 @@ export default function ConfiguracoesClient({ profile, userEmail }: Props) {
         ))}
 
         <div style={{ display: 'flex', gap: 8, marginTop: 14, alignItems: 'center' }}>
-          <button onClick={handleSaveNotif} style={{ ...btnS, ...btnSm }}>
+          <button onClick={handleSaveNotif} disabled={isPending} style={{ ...btnS, ...btnSm }}>
             Salvar lembretes
           </button>
           <button
@@ -343,10 +323,7 @@ export default function ConfiguracoesClient({ profile, userEmail }: Props) {
       <div style={card}>
         <SectionTitle label="Backup" />
 
-        <CfgRow
-          label="Exportar JSON"
-          desc="Baixa todos os dados do perfil."
-        >
+        <CfgRow label="Exportar JSON" desc="Baixa os dados do perfil.">
           <button
             onClick={() => {
               const dados = { profile, exportedAt: new Date().toISOString() }
@@ -362,26 +339,13 @@ export default function ConfiguracoesClient({ profile, userEmail }: Props) {
           </button>
         </CfgRow>
 
-        <CfgRow
-          label="Limpar dados"
-          desc="Irreversível — remove dados locais e de sessão."
-        >
+        <CfgRow label="Limpar dados locais" desc="Remove dados de sessão do navegador.">
           {!confirmClear ? (
-            <button onClick={() => setConfirmClear(true)} style={btnD}>
-              🗑 Limpar
-            </button>
+            <button onClick={() => setConfirmClear(true)} style={btnD}>🗑 Limpar</button>
           ) : (
             <div style={{ display: 'flex', gap: 6 }}>
-              <button onClick={() => setConfirmClear(false)} style={{ ...btnS, ...btnSm }}>
-                Cancelar
-              </button>
-              <button
-                onClick={() => {
-                  localStorage.clear()
-                  setConfirmClear(false)
-                }}
-                style={btnD}
-              >
+              <button onClick={() => setConfirmClear(false)} style={{ ...btnS, ...btnSm }}>Cancelar</button>
+              <button onClick={() => { localStorage.clear(); setConfirmClear(false) }} style={btnD}>
                 Confirmar
               </button>
             </div>
