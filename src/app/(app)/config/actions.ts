@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import type { Profile } from '@/lib/types'
+import type { Profile, Theme, NotifTimes } from '@/lib/types'
 
 async function getUser() {
   const sb = await createClient()
@@ -26,13 +26,27 @@ export async function actionSalvarPerfil(dados: Partial<Profile>) {
   revalidatePath('/home')
 }
 
-export async function actionSalvarTema(theme: string) {
+export async function actionSalvarTema(tema: Theme) {
   const { sb, user } = await getUser()
   if (!user) return { error: 'Não autenticado' }
 
   const { error } = await sb
     .from('profiles')
-    .update({ theme, updated_at: new Date().toISOString() })
+    .update({ tema, updated_at: new Date().toISOString() })
+    .eq('user_id', user.id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/configuracoes')
+}
+
+export async function actionSalvarNotif(notif_times: NotifTimes) {
+  const { sb, user } = await getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const { error } = await sb
+    .from('profiles')
+    .update({ notif_times, updated_at: new Date().toISOString() })
     .eq('user_id', user.id)
 
   if (error) return { error: error.message }
