@@ -112,18 +112,50 @@ export async function actionDeleteTask(
 }
 
 // ── TAREFAS LIVRES ────────────────────────────────────────────────────────────
+// Se vier "materiaId" no form, a tarefa é anexada dentro daquela matéria
+// (é a mesma linha que existe em index.html e tinha se perdido na migração).
 
 export async function actionAddTarefa(formData: FormData) {
   const { sb, user } = await getUser()
   if (!user) return { error: 'Não autenticado' }
 
+  const nome = formData.get('nome') as string
+  const tag = formData.get('tag') as TagTarefa
+  const prazo = (formData.get('prazo') as string) ?? ''
+  const materiaId = formData.get('materiaId') as string
+
+  if (materiaId) {
+    const { data: materia, error: fetchError } = await sb
+      .from('materias')
+      .select('tasks')
+      .eq('id', materiaId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (fetchError || !materia) return { error: 'Matéria não encontrada' }
+
+    const novaTask = { id: Date.now(), nome, done: false, prazo }
+    const novasTasks = [...(materia.tasks ?? []), novaTask]
+
+    const { error } = await sb
+      .from('materias')
+      .update({ tasks: novasTasks, updated_at: new Date().toISOString() })
+      .eq('id', materiaId)
+      .eq('user_id', user.id)
+
+    if (error) return { error: error.message }
+    revalidatePath('/tarefas')
+    revalidatePath('/home')
+    return
+  }
+
   const tarefa = {
     id: Date.now(),
     user_id: user.id,
-    nome: formData.get('nome') as string,
-    tag: formData.get('tag') as TagTarefa,
+    nome,
+    tag,
     done: false,
-    prazo: formData.get('prazo') as string ?? '',
+    prazo,
     updated_at: new Date().toISOString(),
   }
 

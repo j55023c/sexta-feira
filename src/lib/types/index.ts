@@ -157,7 +157,7 @@ export type MealKey = 'cafe' | 'almoco' | 'pre' | 'pos' | 'jantar' | 'lanche'
 
 export type TagNota = 'geral' | 'senai' | 'escola' | 'fitness' | 'ideia'
 
-export type TagTarefa = 'senai' | 'escola' | 'pessoal' | 'fitness'
+export type TagTarefa = 'escola' | 'pessoal' | 'fitness'
 
 export type NotifTimes = {
   cafe: string

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import type { Materia, TarefaLivre } from '@/lib/types'
+import type { Materia, TarefaLivre, TagTarefa } from '@/lib/types'
 import {
   actionAddMateria, actionDeleteMateria, actionToggleTask, actionDeleteTask, actionAddTaskInline,
   actionAddTarefa, actionToggleTarefa, actionDeleteTarefa,
@@ -15,7 +15,16 @@ function fmtDate(d: string) {
   return `${day}/${m}/${y}`
 }
 
-// ── Estilos reutilizáveis ─────────────────────────────────────────────────────
+// ── Cores por tag — sem senai ─────────────────────────────────────────────
+const TAG_COLORS: Record<TagTarefa, { bg: string; color: string }> = {
+  escola:  { bg: 'var(--blue-bg)',  color: 'var(--blue)'  },
+  pessoal: { bg: 'var(--surface2)', color: 'var(--muted)' },
+  fitness: { bg: 'var(--green-bg)', color: 'var(--green)' },
+}
+const TAG_LABELS: Record<TagTarefa, string> = {
+  escola: 'Escola', pessoal: 'Pessoal', fitness: 'Fitness',
+}
+
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '9px 11px', border: '1px solid var(--border2)',
   borderRadius: 'var(--radius)', background: 'var(--surface2)', color: 'var(--text)',
@@ -44,7 +53,6 @@ export default function TarefasClient({ materias: initialMaterias, tarefasLivres
   const [showModalTarefa, setShowModalTarefa] = useState(false)
   const [isPending, startTransition] = useTransition()
 
-  // Estado local — otimista: atualiza UI antes do servidor confirmar
   const [materias, setMaterias] = useState(initialMaterias)
   const [tarefasLivres, setTarefas] = useState(initialTarefas)
 
@@ -52,7 +60,7 @@ export default function TarefasClient({ materias: initialMaterias, tarefasLivres
     setOpenBlocks(prev => ({ ...prev, [id]: !prev[id] }))
   }
 
-  // ── Matérias ────────────────────────────────────────────────────────────────
+  // ── Matérias ────────────────────────────────────────────────────────────
   function handleAddMateria(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
@@ -94,13 +102,22 @@ export default function TarefasClient({ materias: initialMaterias, tarefasLivres
     startTransition(async () => { await actionAddTaskInline(materiaId, nome.trim(), materia.tasks) })
   }
 
-  // ── Tarefas livres ──────────────────────────────────────────────────────────
+  // ── Tarefas livres (agora com vínculo opcional a matéria) ────────────────
   function handleAddTarefa(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
     const nome = fd.get('nome') as string
+    const materiaId = fd.get('materiaId') as string
     if (!nome?.trim()) return
     setShowModalTarefa(false)
+
+    if (materiaId) {
+      const materia = materias.find(m => m.id === Number(materiaId))
+      if (materia) {
+        const novaTask = { id: Date.now(), nome: nome.trim(), done: false, prazo: fd.get('prazo') as string ?? '' }
+        setMaterias(prev => prev.map(m => m.id === materia.id ? { ...m, tasks: [...m.tasks, novaTask] } : m))
+      }
+    }
     startTransition(async () => { await actionAddTarefa(fd) })
   }
 
@@ -129,10 +146,10 @@ export default function TarefasClient({ materias: initialMaterias, tarefasLivres
       const prazoColor = d === null ? 'var(--muted)' : d < 0 ? 'var(--red)' : d <= 3 ? 'var(--amber)' : 'var(--muted)'
       const prazoBackground = d === null ? 'var(--surface2)' : d < 0 ? 'var(--red-bg)' : d <= 3 ? 'var(--amber-bg)' : 'var(--surface2)'
       const isOpen = openBlocks[m.id]
+      const tagStyle = TAG_COLORS[m.tag] ?? TAG_COLORS.pessoal
 
       return (
         <div key={m.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', marginBottom: 12, overflow: 'hidden' }}>
-          {/* Header da matéria */}
           <div
             onClick={() => toggleBlock(m.id)}
             style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', cursor: 'pointer', borderBottom: isOpen ? '1px solid var(--border)' : 'none' }}
@@ -140,14 +157,13 @@ export default function TarefasClient({ materias: initialMaterias, tarefasLivres
             <span style={{
               fontSize: 9.5, fontWeight: 700, letterSpacing: .8, textTransform: 'uppercase',
               padding: '2px 8px', borderRadius: 999,
-              background: m.tag === 'senai' ? 'var(--blue-bg)' : m.tag === 'escola' ? 'var(--green-bg)' : 'var(--surface2)',
-              color: m.tag === 'senai' ? 'var(--blue)' : m.tag === 'escola' ? 'var(--green)' : 'var(--muted)',
+              background: tagStyle.bg, color: tagStyle.color,
             }}>
-              {m.tag}
+              {TAG_LABELS[m.tag] ?? m.tag}
             </span>
             <span style={{ flex: 1, fontSize: 14, fontWeight: 700 }}>{m.nome}</span>
             <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: prazoBackground, color: prazoColor }}>
-              📅 {prazoLabel}
+              {prazoLabel}
             </span>
             <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-dm-mono)' }}>{pend} pend.</span>
             <button
@@ -156,7 +172,6 @@ export default function TarefasClient({ materias: initialMaterias, tarefasLivres
             >✕</button>
           </div>
 
-          {/* Tasks */}
           {isOpen && (
             <div>
               {m.tasks.map(t => (
@@ -194,7 +209,7 @@ export default function TarefasClient({ materias: initialMaterias, tarefasLivres
   function renderLista() {
     const all = [
       ...materias.flatMap(m => m.tasks.map(t => ({ ...t, src: m.nome, tipo: 'materia' as const, materiaId: m.id }))),
-      ...tarefasLivres.map(t => ({ ...t, src: t.tag, tipo: 'livre' as const, materiaId: 0 })),
+      ...tarefasLivres.map(t => ({ ...t, src: TAG_LABELS[t.tag] ?? t.tag, tipo: 'livre' as const, materiaId: 0 })),
     ]
     const pend = all.filter(t => !t.done)
     const done = all.filter(t => t.done)
@@ -243,13 +258,11 @@ export default function TarefasClient({ materias: initialMaterias, tarefasLivres
     )
   }
 
-  // ── JSX principal ─────────────────────────────────────────────────────────
   return (
     <div>
       <h1 style={{ fontSize: 21, fontWeight: 800, marginBottom: 3, color: 'var(--text)' }}>Tarefas</h1>
       <p style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 20 }}>Organize suas atividades por disciplina ou em lista única.</p>
 
-      {/* Controles */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
         <button onClick={() => setMode('materia')} style={{ ...btnP, ...btnSm, background: mode === 'materia' ? 'var(--accent)' : 'var(--surface2)', color: mode === 'materia' ? 'white' : 'var(--text)', border: mode === 'materia' ? 'none' : '1px solid var(--border2)' }}>Por matéria</button>
         <button onClick={() => setMode('lista')} style={{ ...btnP, ...btnSm, background: mode === 'lista' ? 'var(--accent)' : 'var(--surface2)', color: mode === 'lista' ? 'white' : 'var(--text)', border: mode === 'lista' ? 'none' : '1px solid var(--border2)' }}>Lista geral</button>
@@ -259,19 +272,16 @@ export default function TarefasClient({ materias: initialMaterias, tarefasLivres
         </div>
       </div>
 
-      {/* Conteúdo */}
       {mode === 'materia' ? renderMaterias() : renderLista()}
 
-      {/* Modal: Nova matéria */}
       {showModalMateria && (
-        <Modal title="📚 Nova matéria" onClose={() => setShowModalMateria(false)}>
+        <Modal title="Nova matéria" onClose={() => setShowModalMateria(false)}>
           <form onSubmit={handleAddMateria} style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
             <Field label="Nome"><input name="nome" type="text" placeholder="Ex: Eletricidade básica" required style={inputStyle} /></Field>
             <Field label="Tag">
               <select name="tag" style={inputStyle}>
-                <option value="senai">📚 Estudos</option>
-                <option value="escola">🏫 Trabalho</option>
-                <option value="pessoal">👤 Pessoal</option>
+                <option value="escola">Escola</option>
+                <option value="pessoal">Pessoal</option>
               </select>
             </Field>
             <Field label="Prazo"><input name="prazo" type="date" style={inputStyle} /></Field>
@@ -286,17 +296,21 @@ export default function TarefasClient({ materias: initialMaterias, tarefasLivres
         </Modal>
       )}
 
-      {/* Modal: Nova tarefa */}
       {showModalTarefa && (
-        <Modal title="✓ Nova tarefa" onClose={() => setShowModalTarefa(false)}>
+        <Modal title="Nova tarefa" onClose={() => setShowModalTarefa(false)}>
           <form onSubmit={handleAddTarefa} style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
             <Field label="Nome"><input name="nome" type="text" placeholder="Ex: Resolver exercício da apostila" required style={inputStyle} /></Field>
             <Field label="Tag">
               <select name="tag" style={inputStyle}>
-                <option value="senai">📚 Estudos</option>
-                <option value="escola">🏫 Trabalho</option>
-                <option value="pessoal">👤 Pessoal</option>
-                <option value="fitness">🏋️ Fitness</option>
+                <option value="escola">Escola</option>
+                <option value="pessoal">Pessoal</option>
+                <option value="fitness">Fitness</option>
+              </select>
+            </Field>
+            <Field label="Vincular a uma matéria (opcional)">
+              <select name="materiaId" style={inputStyle}>
+                <option value="">— Lista geral —</option>
+                {materias.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
               </select>
             </Field>
             <Field label="Prazo"><input name="prazo" type="date" style={inputStyle} /></Field>
@@ -310,8 +324,6 @@ export default function TarefasClient({ materias: initialMaterias, tarefasLivres
     </div>
   )
 }
-
-// ── Componentes auxiliares pequenos ──────────────────────────────────────────
 
 function Divider({ label }: { label: string }) {
   return (
@@ -335,9 +347,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <>
-      {/* Overlay */}
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(25,23,20,.55)', backdropFilter: 'blur(3px)', zIndex: 200 }} />
-      {/* Modal */}
       <div style={{
         position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
         width: 460, maxWidth: '95vw', background: 'var(--surface)',
