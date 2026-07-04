@@ -1,7 +1,6 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { Profile } from '@/lib/types'
 
@@ -11,37 +10,42 @@ async function getUser() {
   return { sb, user }
 }
 
-export async function actionSalvarPerfil(dados: Partial<Profile>) {
+// Aplica metas calculadas no perfil (Nutrição)
+export async function actionAplicarMetas(metas: Partial<Profile>) {
   const { sb, user } = await getUser()
   if (!user) return { error: 'Não autenticado' }
 
   const { error } = await sb
     .from('profiles')
-    .update({ ...dados, updated_at: new Date().toISOString() })
+    .update({ ...metas, updated_at: new Date().toISOString() })
     .eq('user_id', user.id)
 
   if (error) return { error: error.message }
 
-  revalidatePath('/configuracoes')
+  revalidatePath('/calculadora')
+  revalidatePath('/nutricao')
+  revalidatePath('/protocolo')
   revalidatePath('/home')
 }
 
-export async function actionSalvarTema(theme: string) {
+// Salva metas manuais no perfil
+export async function actionSalvarMetasManuais(metas: {
+  kcal_meta: number
+  prot_meta: number
+  carbo_meta: number
+  gord_meta: number
+}) {
   const { sb, user } = await getUser()
   if (!user) return { error: 'Não autenticado' }
 
   const { error } = await sb
     .from('profiles')
-    .update({ theme, updated_at: new Date().toISOString() })
+    .update({ ...metas, updated_at: new Date().toISOString() })
     .eq('user_id', user.id)
 
   if (error) return { error: error.message }
 
-  revalidatePath('/configuracoes')
-}
-
-export async function actionLogout() {
-  const { sb } = await getUser()
-  await sb.auth.signOut()
-  redirect('/auth')
+  revalidatePath('/calculadora')
+  revalidatePath('/nutricao')
+  revalidatePath('/home')
 }
