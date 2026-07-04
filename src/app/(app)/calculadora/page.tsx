@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { dbLoadProfile } from '@/lib/db'
+import { dbLoadProfile, dbLoadFisico } from '@/lib/db'
 import CalculadoraClient from './CalculadoraClient'
 
 export default async function CalculadoraPage() {
@@ -8,12 +8,15 @@ export default async function CalculadoraPage() {
   const { data: { user } } = await sb.auth.getUser()
   if (!user) redirect('/auth')
 
-  const profile = await dbLoadProfile(user.id)
+  const [profile, fisicoLog] = await Promise.all([
+    dbLoadProfile(user.id),
+    dbLoadFisico(user.id),
+  ])
 
   return (
     <CalculadoraClient
       profile={profile}
-      userEmail={user.email ?? ''}
+      fisicoLog={fisicoLog}
     />
   )
 }
