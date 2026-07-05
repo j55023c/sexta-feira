@@ -211,7 +211,8 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, cardapios
         borderRadius: 'var(--radius-lg)', padding: '18px 20px',
         marginBottom: 16, position: 'relative', overflow: 'hidden',
       }}>
-        <div style={{ position: 'absolute', top: -40, right: -40, width: 180, height: 180, borderRadius: '50%', border: '40px solid rgba(200,68,26,.15)', pointerEvents: 'none' }} />
+        {/* Círculo decorativo — era rgba(200,68,26,.15) fixo, agora var(--accent-glow-15) */}
+        <div style={{ position: 'absolute', top: -40, right: -40, width: 180, height: 180, borderRadius: '50%', border: '40px solid var(--accent-glow-15)', pointerEvents: 'none' }} />
         <div style={{ position: 'relative', zIndex: 1 }}>
           <div style={{ fontSize: 9, letterSpacing: 2, textTransform: 'uppercase', color: 'var(--accent2)', fontWeight: 700, marginBottom: 4 }}>
             Fase atual · desde {fmtDate(protocolo.data_inicio)}
@@ -304,7 +305,7 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, cardapios
               <div style={{ fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.6 }} dangerouslySetInnerHTML={{ __html: protocolo.cardio.replace(/\n/g, '<br/>') }} />
             </div>
           </div>
-          <div style={{ borderLeft: '3px solid var(--accent)', padding: '9px 12px', background: 'rgba(200,68,26,.04)', borderRadius: '0 var(--radius) var(--radius) 0', fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.65 }}>
+          <div style={{ borderLeft: '3px solid var(--accent)', padding: '9px 12px', background: 'var(--accent-glow-10)', borderRadius: '0 var(--radius) var(--radius) 0', fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.65 }}>
             <strong style={{ color: 'var(--text)' }}>Prioridade:</strong> treino de força sempre primeiro. Cárdio só depois.
           </div>
         </div>
@@ -327,7 +328,7 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, cardapios
               ))}
             </div>
           </div>
-          <div style={{ borderLeft: '3px solid var(--accent)', padding: '9px 12px', background: 'rgba(200,68,26,.04)', borderRadius: '0 var(--radius) var(--radius) 0', fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.65 }}>
+          <div style={{ borderLeft: '3px solid var(--accent)', padding: '9px 12px', background: 'var(--accent-glow-10)', borderRadius: '0 var(--radius) var(--radius) 0', fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.65 }}>
             Para recalcular com base no seu peso atual, use a <a href="/calculadora" style={{ color: 'var(--accent)' }}>Calculadora →</a>
           </div>
         </div>
@@ -398,7 +399,7 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, cardapios
       {showModalFase && (
         <Modal title="🔄 Mudar de fase" onClose={() => setShowModalFase(false)}>
           <form onSubmit={handleMudarFase} style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
-            <div style={{ borderLeft: '3px solid var(--accent)', padding: '9px 12px', background: 'rgba(200,68,26,.04)', borderRadius: '0 var(--radius) var(--radius) 0', fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.65, marginBottom: 4 }}>
+            <div style={{ borderLeft: '3px solid var(--accent)', padding: '9px 12px', background: 'var(--accent-glow-10)', borderRadius: '0 var(--radius) var(--radius) 0', fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.65, marginBottom: 4 }}>
               A fase atual será arquivada no histórico.
             </div>
             <Field label="Nova fase">

@@ -61,7 +61,7 @@ export default function HomeClient({ profile, protocolo, materias, tarefasLivres
 
       {/* Coluna esquerda */}
       <div>
-        {/* Card hoje — fundo escuro, círculo decorativo, idêntico ao original */}
+        {/* Card hoje — fundo escuro, círculo decorativo agora tingido pela cor do tema ativo */}
         <div style={{
           background: 'var(--inverse-bg)',
           color: 'var(--inverse-text)',
@@ -71,11 +71,11 @@ export default function HomeClient({ profile, protocolo, materias, tarefasLivres
           position: 'relative',
           overflow: 'hidden',
         }}>
-          {/* Círculo decorativo */}
+          {/* Círculo decorativo — era rgba(200,68,26,.15) fixo, agora var(--accent-glow-15) */}
           <div style={{
             position: 'absolute', top: -40, right: -40,
             width: 180, height: 180, borderRadius: '50%',
-            border: '40px solid rgba(200,68,26,.15)',
+            border: '40px solid var(--accent-glow-15)',
             pointerEvents: 'none',
           }} />
 
@@ -95,7 +95,7 @@ export default function HomeClient({ profile, protocolo, materias, tarefasLivres
 
             <div style={{
               display: 'inline-flex', alignItems: 'center', gap: 5,
-              background: 'rgba(200,68,26,.2)', border: '1px solid rgba(200,68,26,.3)',
+              background: 'var(--accent-glow-20)', border: '1px solid var(--accent-glow-30)',
               borderRadius: 999, padding: '3px 10px', fontSize: 12, fontWeight: 700, color: 'var(--accent2)',
             }}>
               🔥 {profile?.streak_count ?? 0} dia{profile?.streak_count !== 1 ? 's' : ''}

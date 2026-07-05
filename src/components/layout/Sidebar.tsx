@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useState } from 'react'
 import { signOut } from '@/app/auth/actions'
 
 // ── Definição dos itens de navegação ─────────────────────────────────────────
@@ -47,9 +48,10 @@ interface SidebarProps {
 
 export default function Sidebar({ userEmail }: SidebarProps) {
   const pathname = usePathname()
+  // Estado de hover por item — inline style não suporta pseudo-classe :hover,
+  // então controlamos via onMouseEnter/onMouseLeave (mesmo padrão do resto do app).
+  const [hoveredHref, setHoveredHref] = useState<string | null>(null)
 
-  // usePathname() lê a URL atual — ex: '/tarefas'
-  // Isso substitui toda a lógica manual de active/inactive do HTML original
   const isActive = (href: string) => pathname === href
 
   return (
@@ -107,34 +109,46 @@ export default function Sidebar({ userEmail }: SidebarProps) {
             {group.section}
           </div>
 
-          {group.items.map(item => (
-            <Link
-              key={item.href}
-              href={item.href}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                padding: '8px 18px',
-                fontSize: 13,
-                fontWeight: 500,
-                textDecoration: 'none',
-                color: isActive(item.href) ? 'var(--sidebar-text)' : '#908880',
-                borderLeft: isActive(item.href)
-                  ? '2px solid var(--accent)'
-                  : '2px solid transparent',
-                background: isActive(item.href)
-                  ? 'rgba(200,68,26,.1)'
-                  : 'transparent',
-                transition: 'all .14s',
-              }}
-            >
-              <span style={{ fontSize: 14, width: 18, textAlign: 'center', flexShrink: 0 }}>
-                {item.icon}
-              </span>
-              <span>{item.label}</span>
-            </Link>
-          ))}
+          {group.items.map(item => {
+            const active = isActive(item.href)
+            const hovered = hoveredHref === item.href && !active
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onMouseEnter={() => setHoveredHref(item.href)}
+                onMouseLeave={() => setHoveredHref(null)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '8px 18px',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  textDecoration: 'none',
+                  color: active || hovered ? 'var(--sidebar-text)' : '#908880',
+                  borderLeft: active
+                    ? '2px solid var(--accent)'
+                    : hovered
+                      ? '2px solid var(--accent-glow-30)'
+                      : '2px solid transparent',
+                  background: active
+                    ? 'var(--accent-glow-10)'
+                    : hovered
+                      ? 'rgba(255,255,255,.04)'
+                      : 'transparent',
+                  transform: hovered ? 'translateX(3px)' : 'translateX(0)',
+                  transition: 'all .16s ease',
+                }}
+              >
+                <span style={{ fontSize: 14, width: 18, textAlign: 'center', flexShrink: 0 }}>
+                  {item.icon}
+                </span>
+                <span>{item.label}</span>
+              </Link>
+            )
+          })}
         </div>
       ))}
 
@@ -148,7 +162,6 @@ export default function Sidebar({ userEmail }: SidebarProps) {
         gap: 6,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          {/* Dot de status — sempre verde (sessão única garante isso) */}
           <span style={{
             display: 'inline-block',
             width: 6,
@@ -169,7 +182,6 @@ export default function Sidebar({ userEmail }: SidebarProps) {
             {userEmail}
           </span>
 
-          {/* Logout via Server Action */}
           <form action={signOut}>
             <button
               type="submit"

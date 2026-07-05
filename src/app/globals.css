@@ -12,6 +12,10 @@
   --hint: #aaa49c;
   --accent: #c8441a;
   --accent2: #e85c2a;
+  --accent-glow-10: rgba(200,68,26,.10);
+  --accent-glow-15: rgba(200,68,26,.15);
+  --accent-glow-20: rgba(200,68,26,.20);
+  --accent-glow-30: rgba(200,68,26,.30);
   --green: #2a6030;
   --green-bg: #ecf4ed;
   --amber: #a06018;
@@ -49,6 +53,10 @@
   --hint: #6a655e;
   --accent: #e8702f;
   --accent2: #f4925a;
+  --accent-glow-10: rgba(232,112,47,.10);
+  --accent-glow-15: rgba(232,112,47,.15);
+  --accent-glow-20: rgba(232,112,47,.20);
+  --accent-glow-30: rgba(232,112,47,.30);
   --green: #5fbf6f;
   --green-bg: #10301a;
   --amber: #e0a83f;
@@ -80,6 +88,10 @@
   --hint: #4a567a;
   --accent: #5fa0e8;
   --accent2: #7eb8f5;
+  --accent-glow-10: rgba(95,160,232,.10);
+  --accent-glow-15: rgba(95,160,232,.15);
+  --accent-glow-20: rgba(95,160,232,.20);
+  --accent-glow-30: rgba(95,160,232,.30);
   --green: #5fc480;
   --green-bg: #0e2818;
   --amber: #e0ac4f;
@@ -111,6 +123,10 @@
   --hint: #8aaa88;
   --accent: #2e7a2e;
   --accent2: #3a9a3a;
+  --accent-glow-10: rgba(46,122,46,.10);
+  --accent-glow-15: rgba(46,122,46,.15);
+  --accent-glow-20: rgba(46,122,46,.20);
+  --accent-glow-30: rgba(46,122,46,.30);
   --green: #256a2e;
   --green-bg: #e0f0e0;
   --amber: #8a5c14;
@@ -142,6 +158,10 @@
   --hint: #c09098;
   --accent: #c02060;
   --accent2: #e03070;
+  --accent-glow-10: rgba(192,32,96,.10);
+  --accent-glow-15: rgba(192,32,96,.15);
+  --accent-glow-20: rgba(192,32,96,.20);
+  --accent-glow-30: rgba(192,32,96,.30);
   --green: #1d6b34;
   --green-bg: #e0f3e4;
   --amber: #8a5c14;
