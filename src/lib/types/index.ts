@@ -72,6 +72,17 @@ export interface Nota {
   updated_at?: string
 }
 
+// ── Tags de Tarefas (customizáveis pelo usuário) ──
+// Guardadas como catálogo separado — a tarefa/matéria guarda o NOME da tag
+// como texto simples, não uma referência por id. Ver explicação no chat.
+export interface Tag {
+  id: string
+  user_id?: string
+  nome: string
+  cor: string
+  created_at?: string
+}
+
 // ── Matérias e Tarefas ──
 export interface Tarefa {
   id: number
@@ -84,7 +95,7 @@ export interface Materia {
   id: number
   user_id?: string
   nome: string
-  tag: TagTarefa
+  tag: string
   prazo: string
   tasks: Tarefa[]
   updated_at?: string
@@ -94,7 +105,7 @@ export interface TarefaLivre {
   id: number
   user_id?: string
   nome: string
-  tag: TagTarefa
+  tag: string
   done: boolean
   prazo: string
   updated_at?: string
@@ -157,8 +168,6 @@ export type MealKey = 'cafe' | 'almoco' | 'pre' | 'pos' | 'jantar' | 'lanche'
 
 export type TagNota = 'geral' | 'senai' | 'escola' | 'fitness' | 'ideia'
 
-export type TagTarefa = 'escola' | 'pessoal' | 'fitness'
-
 export type NotifTimes = {
   cafe: string
   pre: string
@@ -176,6 +185,7 @@ export interface AppState {
   notas: Nota[]
   materias: Materia[]
   tarefasLivres: TarefaLivre[]
+  tags: Tag[]
   nutLog: Record<string, EntradaNut[]>
   waterLog: Record<string, number>
   fisicoLog: Record<string, FisicoLog>

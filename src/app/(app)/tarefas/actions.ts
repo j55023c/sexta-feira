@@ -2,7 +2,6 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import type { TagTarefa } from '@/lib/types'
 
 // Todas as actions usam createServer() — rodam no servidor, têm sessão via cookie.
 // As queries vão direto ao Supabase sem passar pelo client browser.
@@ -11,6 +10,35 @@ async function getUser() {
   const sb = await createClient()
   const { data: { user } } = await sb.auth.getUser()
   return { sb, user }
+}
+
+// ── TAGS (customizáveis) ──────────────────────────────────────────────────────
+// id vem pronto do cliente (gerado lá) pra permitir UI otimista sem esperar o servidor.
+
+export async function actionAddTag(id: string, nome: string, cor: string) {
+  const { sb, user } = await getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const { error } = await sb.from('tags').insert({
+    id,
+    user_id: user.id,
+    nome: nome.trim(),
+    cor,
+    created_at: new Date().toISOString(),
+  })
+  if (error) return { error: error.message }
+
+  revalidatePath('/tarefas')
+}
+
+export async function actionDeleteTag(tagId: string) {
+  const { sb, user } = await getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const { error } = await sb.from('tags').delete().eq('id', tagId).eq('user_id', user.id)
+  if (error) return { error: error.message }
+
+  revalidatePath('/tarefas')
 }
 
 // ── MATÉRIAS ──────────────────────────────────────────────────────────────────
@@ -24,7 +52,7 @@ export async function actionAddMateria(formData: FormData) {
     id: Date.now(),
     user_id: user.id,
     nome: formData.get('nome') as string,
-    tag: formData.get('tag') as TagTarefa,
+    tag: (formData.get('tag') as string) ?? '',
     prazo: formData.get('prazo') as string ?? '',
     tasks: tasksRaw
       ? tasksRaw.split('\n').filter(Boolean).map((s, i) => ({
@@ -112,15 +140,14 @@ export async function actionDeleteTask(
 }
 
 // ── TAREFAS LIVRES ────────────────────────────────────────────────────────────
-// Se vier "materiaId" no form, a tarefa é anexada dentro daquela matéria
-// (é a mesma linha que existe em index.html e tinha se perdido na migração).
+// Se vier "materiaId" no form, a tarefa é anexada dentro daquela matéria.
 
 export async function actionAddTarefa(formData: FormData) {
   const { sb, user } = await getUser()
   if (!user) return { error: 'Não autenticado' }
 
   const nome = formData.get('nome') as string
-  const tag = formData.get('tag') as TagTarefa
+  const tag = (formData.get('tag') as string) ?? ''
   const prazo = (formData.get('prazo') as string) ?? ''
   const materiaId = formData.get('materiaId') as string
 
@@ -167,7 +194,7 @@ export async function actionAddTarefa(formData: FormData) {
 }
 
 export async function actionToggleTarefa(tarefa: {
-  id: number; nome: string; tag: TagTarefa; done: boolean; prazo: string
+  id: number; nome: string; tag: string; done: boolean; prazo: string
 }) {
   const { sb, user } = await getUser()
   if (!user) return { error: 'Não autenticado' }

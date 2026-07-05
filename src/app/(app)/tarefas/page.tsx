@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { dbLoadMaterias, dbLoadTarefas } from '@/lib/db'
+import { dbLoadMaterias, dbLoadTarefas, dbLoadTags } from '@/lib/db'
 import TarefasClient from './TarefasClient'
 
 export default async function TarefasPage() {
@@ -8,10 +8,11 @@ export default async function TarefasPage() {
   const { data: { user } } = await sb.auth.getUser()
   if (!user) redirect('/auth')
 
-  const [materias, tarefasLivres] = await Promise.all([
+  const [materias, tarefasLivres, tags] = await Promise.all([
     dbLoadMaterias(user.id),
     dbLoadTarefas(user.id),
+    dbLoadTags(user.id),
   ])
 
-  return <TarefasClient materias={materias} tarefasLivres={tarefasLivres} />
+  return <TarefasClient materias={materias} tarefasLivres={tarefasLivres} tags={tags} />
 }

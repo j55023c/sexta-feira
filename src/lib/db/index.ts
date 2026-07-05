@@ -3,3 +3,4 @@
 export * from './profile'
 export * from './content'
 export * from './fitness'
+export * from './tags'
