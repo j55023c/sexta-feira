@@ -4,19 +4,47 @@ import { useState, useTransition } from 'react'
 import type { Protocolo, Cardapio, Profile, HistoricoFase, Fase, DiaProtocolo } from '@/lib/types'
 import { actionSaveProtocolo, actionMudarFase, actionSaveCardapio, actionDeleteCardapio } from './actions'
 
-// ── Dados estáticos (idênticos ao HTML original) ──────────────────────────────
-const REGRAS = [
-  { num: '01', title: 'Proteína é inegociável', desc: 'Pode cortar carbo, pode cortar gordura, pode pular o feijão. Nunca zere a proteína. Meta mínima: 150g/dia.' },
-  { num: '02', title: 'Salada e legume são livres', desc: 'Folhas, tomate, pepino, cenoura, chuchu, abobrinha — à vontade. Quase zero caloria.' },
-  { num: '03', title: 'Frango sem pele é preferível', desc: 'Peito ou sobrecoxa sem pele. Com pele, reduza 0,5 col.' },
-  { num: '04', title: 'Carne gorda = menos quantidade', desc: 'Costela, fraldinha, cupim: reduza para 2 col. cheias. Patinho e coxão duro são os mais magros.' },
-  { num: '05', title: 'Um dia ruim não desfaz nada', desc: 'Voltando ao plano no dia seguinte, um erro é irrelevante no contexto de 20 semanas.' },
-  { num: '06', title: 'Nunca compense cortando', desc: 'Errou ontem? Hoje volta ao normal. Não corte calorias para "equilibrar".' },
-  { num: '07', title: 'Sono não é negociável', desc: 'Menos de 7h = cortisol alto, mais fome, menos GH, mais catabolismo.' },
-  { num: '08', title: 'Consistência > perfeição', desc: '80% de adesão por 20 semanas é infinitamente melhor que 100% por 3 semanas e abandono.' },
-  { num: '09', title: 'Fome leve é normal, fome intensa não', desc: 'Fome intensa e constante = déficit alto demais — aumente 200 kcal.' },
-  { num: '10', title: 'A força é o termômetro', desc: 'Perdeu mais de 10–15% de força? Primeiro aumente calorias, depois investigue sono e proteína.' },
-]
+// ── Regras por fase (RASCUNHO — revisar antes de considerar definitivo) ──────
+// O index.html original só tinha um conjunto (voltado a cutting). Bulking e
+// manutenção abaixo são redação nova, no mesmo tom das originais.
+const REGRAS_POR_FASE: Record<Fase, { num: string; title: string; desc: string }[]> = {
+  cutting: [
+    { num: '01', title: 'Proteína é inegociável', desc: 'Pode cortar carbo, pode cortar gordura, pode pular o feijão. Nunca zere a proteína. Meta mínima: 150g/dia.' },
+    { num: '02', title: 'Salada e legume são livres', desc: 'Folhas, tomate, pepino, cenoura, chuchu, abobrinha — à vontade. Quase zero caloria.' },
+    { num: '03', title: 'Frango sem pele é preferível', desc: 'Peito ou sobrecoxa sem pele. Com pele, reduza 0,5 col.' },
+    { num: '04', title: 'Carne gorda = menos quantidade', desc: 'Costela, fraldinha, cupim: reduza para 2 col. cheias. Patinho e coxão duro são os mais magros.' },
+    { num: '05', title: 'Um dia ruim não desfaz nada', desc: 'Voltando ao plano no dia seguinte, um erro é irrelevante no contexto de 20 semanas.' },
+    { num: '06', title: 'Nunca compense cortando', desc: 'Errou ontem? Hoje volta ao normal. Não corte calorias para "equilibrar".' },
+    { num: '07', title: 'Sono não é negociável', desc: 'Menos de 7h = cortisol alto, mais fome, menos GH, mais catabolismo.' },
+    { num: '08', title: 'Consistência > perfeição', desc: '80% de adesão por 20 semanas é infinitamente melhor que 100% por 3 semanas e abandono.' },
+    { num: '09', title: 'Fome leve é normal, fome intensa não', desc: 'Fome intensa e constante = déficit alto demais — aumente 200 kcal.' },
+    { num: '10', title: 'A força é o termômetro', desc: 'Perdeu mais de 10–15% de força? Primeiro aumente calorias, depois investigue sono e proteína.' },
+  ],
+  bulking: [
+    { num: '01', title: 'Proteína continua prioridade', desc: 'O superávit não é desculpa pra relaxar na proteína. Meta mínima segue em 2g/kg.' },
+    { num: '02', title: 'Superávit controlado', desc: '300–500 kcal acima da manutenção. Mais que isso é gordura acumulando, não músculo.' },
+    { num: '03', title: 'Peso subindo rápido demais é sinal de alerta', desc: 'Ganho acima de 0,5kg/semana quase sempre é gordura. Ajuste as calorias pra baixo.' },
+    { num: '04', title: 'Sobrecarga progressiva é o motor', desc: 'Sem progredir carga/repetição, o superávit vira só gordura — o estímulo é o que conta.' },
+    { num: '05', title: 'Coma mais nos dias de treino pesado', desc: 'Ciclar carboidrato ao redor do treino rende mais que espalhar igual no dia todo.' },
+    { num: '06', title: 'Sono de 8h+ é onde o músculo é construído', desc: 'Bulking com sono ruim é superávit desperdiçado.' },
+    { num: '07', title: 'Ritmo ideal: ~0,3kg/semana', desc: 'Mais rápido que isso quase sempre significa gordura entrando junto.' },
+    { num: '08', title: 'Gordura não é vilã aqui', desc: 'Só não deixe passar de ~30% das calorias totais — o resto é carbo pra sustentar o treino.' },
+    { num: '09', title: 'Evite o "bulk sujo"', desc: 'Comer qualquer coisa em excesso não acelera ganho de músculo, só de gordura.' },
+    { num: '10', title: 'Consistência de 12+ semanas > 3 semanas de exagero', desc: 'Bulking é jogo longo. Resultado visível vem da manutenção do processo, não da intensidade de uma semana.' },
+  ],
+  manutencao: [
+    { num: '01', title: 'Objetivo é estabilidade, não progresso rápido', desc: 'Aqui você consolida o que já foi conquistado — não é hora de forçar nada.' },
+    { num: '02', title: 'Calorias na média do TDEE', desc: 'Sem déficit nem superávit forçado. O corpo tende a se ajustar sozinho perto do gasto real.' },
+    { num: '03', title: 'Proteína continua alta', desc: 'É o macronutriente que preserva o que você construiu na fase anterior.' },
+    { num: '04', title: 'Ótima janela pra recalibrar hábitos', desc: 'Sono, rotina de treino, organização da dieta — ajuste aqui o que ficou pra trás.' },
+    { num: '05', title: 'Sem prazo fixo', desc: 'Fique nessa fase até se sentir pronto pra decidir a próxima direção com clareza.' },
+    { num: '06', title: 'Pesagem semanal já basta', desc: 'Pesar todo dia nessa fase só gera ruído — a tendência de 7 dias é o que importa.' },
+    { num: '07', title: 'Treino continua com intensidade', desc: 'Manutenção não é sinônimo de treino leve — a sobrecarga progressiva não pausa.' },
+    { num: '08', title: 'Boa fase pra testar', desc: 'Novo alimento, novo horário de treino, novo suplemento — o risco de sair da meta é baixo aqui.' },
+    { num: '09', title: 'Oscilação de ±1kg é normal', desc: 'Água corporal e glicogênio flutuam. Não é motivo de alarme nem de ação corretiva.' },
+    { num: '10', title: 'Use como base pra decidir a próxima fase', desc: 'Terminando a manutenção com dados estáveis, fica mais fácil escolher: cutting ou bulking de novo.' },
+  ],
+}
 
 const FASE_INFO: Record<Fase, { label: string; icon: string; tagBg: string; tagColor: string }> = {
   bulking:    { label: 'Bulking',     icon: '📈', tagBg: 'var(--blue-bg)',   tagColor: 'var(--blue)'  },
@@ -121,6 +149,7 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, cardapios
 
   const fi = FASE_INFO[protocolo.fase]
   const cardapioAtivo = cardapios.find(c => c.id === protocolo.cardapio_ativo_id)
+  const regrasAtivas = REGRAS_POR_FASE[protocolo.fase]
 
   // ── Salvar protocolo ────────────────────────────────────────────────────────
   function handleSaveProtocolo(e: React.FormEvent<HTMLFormElement>) {
@@ -211,7 +240,6 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, cardapios
         borderRadius: 'var(--radius-lg)', padding: '18px 20px',
         marginBottom: 16, position: 'relative', overflow: 'hidden',
       }}>
-        {/* Círculo decorativo — era rgba(200,68,26,.15) fixo, agora var(--accent-glow-15) */}
         <div style={{ position: 'absolute', top: -40, right: -40, width: 180, height: 180, borderRadius: '50%', border: '40px solid var(--accent-glow-15)', pointerEvents: 'none' }} />
         <div style={{ position: 'relative', zIndex: 1 }}>
           <div style={{ fontSize: 9, letterSpacing: 2, textTransform: 'uppercase', color: 'var(--accent2)', fontWeight: 700, marginBottom: 4 }}>
@@ -334,11 +362,16 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, cardapios
         </div>
       )}
 
-      {/* Tab: Regras */}
+      {/* Tab: Regras — agora específicas por fase */}
       {tab === 'regras' && (
         <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: fi.tagBg, color: fi.tagColor, textTransform: 'uppercase', letterSpacing: .8 }}>
+              {fi.icon} Regras de {fi.label}
+            </span>
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 10, marginBottom: 14 }}>
-            {REGRAS.map(r => (
+            {regrasAtivas.map(r => (
               <div key={r.num} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
                 <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--surface2)', lineHeight: 1, marginBottom: 5 }}>{r.num}</div>
                 <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 3 }}>{r.title}</div>
@@ -400,7 +433,7 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, cardapios
         <Modal title="🔄 Mudar de fase" onClose={() => setShowModalFase(false)}>
           <form onSubmit={handleMudarFase} style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
             <div style={{ borderLeft: '3px solid var(--accent)', padding: '9px 12px', background: 'var(--accent-glow-10)', borderRadius: '0 var(--radius) var(--radius) 0', fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.65, marginBottom: 4 }}>
-              A fase atual será arquivada no histórico.
+              A fase atual será arquivada no histórico. As regras da aba Regras trocam automaticamente.
             </div>
             <Field label="Nova fase">
               <select name="fase" defaultValue={protocolo.fase} style={inputStyle}>
