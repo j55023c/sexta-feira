@@ -1,12 +1,11 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import type { Protocolo, Cardapio, Profile, HistoricoFase, Fase, DiaProtocolo } from '@/lib/types'
-import { actionSaveProtocolo, actionMudarFase, actionSaveCardapio, actionDeleteCardapio } from './actions'
+import Link from 'next/link'
+import type { Protocolo, Profile, HistoricoFase, Fase, DiaProtocolo } from '@/lib/types'
+import { actionSaveProtocolo, actionMudarFase } from './actions'
 
 // ── Regras por fase (RASCUNHO — revisar antes de considerar definitivo) ──────
-// O index.html original só tinha um conjunto (voltado a cutting). Bulking e
-// manutenção abaixo são redação nova, no mesmo tom das originais.
 const REGRAS_POR_FASE: Record<Fase, { num: string; title: string; desc: string }[]> = {
   cutting: [
     { num: '01', title: 'Proteína é inegociável', desc: 'Pode cortar carbo, pode cortar gordura, pode pular o feijão. Nunca zere a proteína. Meta mínima: 150g/dia.' },
@@ -59,7 +58,6 @@ const TIPO_BAR: Record<string, string> = {
   free: 'linear-gradient(90deg,#e2ddd4,#ccc8bf)',
 }
 
-// ── Estilos utilitários ───────────────────────────────────────────────────────
 const card: React.CSSProperties = {
   background: 'var(--surface)', border: '1px solid var(--border)',
   borderRadius: 'var(--radius-lg)', padding: 18,
@@ -128,27 +126,23 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 // ── Props ─────────────────────────────────────────────────────────────────────
 interface Props {
   protocolo: Protocolo | null
-  cardapios: Cardapio[]
   profile: Profile | null
-  historico: HistoricoFase[]
+  historico?: HistoricoFase[]
 }
 
 type Tab = 'semana' | 'cardio' | 'metas' | 'regras' | 'editar'
 
-export default function ProtocoloClient({ protocolo: initialProtocolo, cardapios: initialCardapios, profile, historico }: Props) {
+export default function ProtocoloClient({ protocolo: initialProtocolo, profile }: Props) {
   const [protocolo, setProtocolo] = useState<Protocolo>(initialProtocolo ?? {
     nome: 'Meu protocolo', desc_texto: '', cardio: '', fase: 'cutting',
     data_inicio: new Date().toISOString().split('T')[0],
     cardapio_ativo_id: 'padrao', dias: [],
   })
-  const [cardapios, setCardapios] = useState(initialCardapios)
   const [tab, setTab] = useState<Tab>('semana')
   const [showModalFase, setShowModalFase] = useState(false)
-  const [showModalCardapio, setShowModalCardapio] = useState(false)
   const [isPending, startTransition] = useTransition()
 
   const fi = FASE_INFO[protocolo.fase]
-  const cardapioAtivo = cardapios.find(c => c.id === protocolo.cardapio_ativo_id)
   const regrasAtivas = REGRAS_POR_FASE[protocolo.fase]
 
   // ── Salvar protocolo ────────────────────────────────────────────────────────
@@ -171,45 +165,17 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, cardapios
     const fd = new FormData(e.currentTarget)
     const novaFase = fd.get('fase') as Fase
     const novoNome = fd.get('nome') as string
-    const novoCardapio = fd.get('cardapio') as string
     const today = new Date().toISOString().split('T')[0]
 
-    setProtocolo(prev => ({ ...prev, fase: novaFase, nome: novoNome || prev.nome, cardapio_ativo_id: novoCardapio, data_inicio: today }))
+    setProtocolo(prev => ({ ...prev, fase: novaFase, nome: novoNome || prev.nome, data_inicio: today }))
     setShowModalFase(false)
 
     startTransition(async () => {
-      await actionMudarFase(novaFase, novoNome, novoCardapio, {
+      await actionMudarFase(novaFase, novoNome, protocolo.cardapio_ativo_id, {
         fase: protocolo.fase, nome: protocolo.nome, dataInicio: protocolo.data_inicio,
         kcalMeta: profile?.kcal_meta ?? 2000, protMeta: profile?.prot_meta ?? 160,
       })
     })
-  }
-
-  // ── Criar cardápio ──────────────────────────────────────────────────────────
-  function handleCriarCardapio(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const fd = new FormData(e.currentTarget)
-    const novo: Cardapio = {
-      id: 'c' + Date.now(),
-      nome: fd.get('nome') as string,
-      objetivo: fd.get('objetivo') as Fase,
-      built_in: false,
-      refeicoes: { cafe: [], almoco: [], pre: [], pos: [], jantar: [] },
-    }
-    setCardapios(prev => [...prev, novo])
-    setShowModalCardapio(false)
-    startTransition(async () => { await actionSaveCardapio(novo) })
-  }
-
-  // ── Apagar cardápio ─────────────────────────────────────────────────────────
-  function handleDeleteCardapio(id: string) {
-    if (cardapios.length <= 1) return
-    const novoAtivo = cardapios.find(c => c.id !== id)
-    setCardapios(prev => prev.filter(c => c.id !== id))
-    if (protocolo.cardapio_ativo_id === id && novoAtivo) {
-      setProtocolo(prev => ({ ...prev, cardapio_ativo_id: novoAtivo.id }))
-    }
-    startTransition(async () => { await actionDeleteCardapio(id) })
   }
 
   // ── Update dias inline ──────────────────────────────────────────────────────
@@ -220,7 +186,6 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, cardapios
     })
   }
 
-  // ── Tabs ────────────────────────────────────────────────────────────────────
   const TABS: { key: Tab; label: string }[] = [
     { key: 'semana', label: '📅 Semana tipo' },
     { key: 'cardio', label: '🏃 Cárdio' },
@@ -259,29 +224,17 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, cardapios
         </div>
       </div>
 
-      {/* Cardápio ativo */}
-      <div style={{ ...card, marginBottom: 16 }}>
-        <Divider label="Cardápio ativo" />
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <select
-            value={protocolo.cardapio_ativo_id}
-            onChange={e => {
-              const id = e.target.value
-              setProtocolo(prev => ({ ...prev, cardapio_ativo_id: id }))
-              startTransition(async () => { await actionSaveProtocolo({ ...protocolo, cardapio_ativo_id: id }) })
-            }}
-            style={{ ...inputStyle, flex: 1, minWidth: 200 }}
-          >
-            {cardapios.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
-          </select>
-          <button onClick={() => setShowModalCardapio(true)} style={{ ...btnS, ...btnSm }}>+ Novo</button>
-          <button
-            onClick={() => { if (cardapioAtivo) handleDeleteCardapio(cardapioAtivo.id) }}
-            disabled={cardapios.length <= 1}
-            style={{ ...btnSm, border: 'none', borderRadius: 'var(--radius)', fontFamily: 'var(--font-syne)', fontWeight: 700, cursor: 'pointer', background: 'var(--red-bg)', color: 'var(--red)', fontSize: 11, opacity: cardapios.length <= 1 ? .4 : 1 }}
-          >🗑 Apagar</button>
+      {/* Cardápio ativo — agora é link direto pro guia de Dieta, não seletor */}
+      <Link href="/dieta" style={{ textDecoration: 'none' }}>
+        <div style={{ ...card, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', transition: 'border-color .14s' }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--amber-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>🍽</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Guia de dieta</div>
+            <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>Café, almoço, pré/pós-treino, jantar, emergências e trocas — fase {fi.label.toLowerCase()}</div>
+          </div>
+          <span style={{ color: 'var(--accent)', fontSize: 18 }}>→</span>
         </div>
-      </div>
+      </Link>
 
       {/* Tabs */}
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border2)', marginBottom: 18, overflowX: 'auto' }}>
@@ -362,7 +315,7 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, cardapios
         </div>
       )}
 
-      {/* Tab: Regras — agora específicas por fase */}
+      {/* Tab: Regras — específicas por fase */}
       {tab === 'regras' && (
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
@@ -442,39 +395,12 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, cardapios
                 <option value="manutencao">Manutenção ⚖️</option>
               </select>
             </Field>
-            <Field label="Cardápio sugerido">
-              <select name="cardapio" defaultValue={protocolo.cardapio_ativo_id} style={inputStyle}>
-                {cardapios.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
-              </select>
-            </Field>
             <Field label="Nome do novo protocolo">
               <input name="nome" type="text" placeholder="Ex: Cutting — Jul 2026" style={inputStyle} />
             </Field>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 4 }}>
               <button type="button" onClick={() => setShowModalFase(false)} style={{ ...btnS, ...btnSm }}>Cancelar</button>
               <button type="submit" disabled={isPending} style={{ ...btnP, ...btnSm }}>Confirmar</button>
-            </div>
-          </form>
-        </Modal>
-      )}
-
-      {/* Modal: Novo cardápio */}
-      {showModalCardapio && (
-        <Modal title="🍽 Novo cardápio" onClose={() => setShowModalCardapio(false)}>
-          <form onSubmit={handleCriarCardapio} style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
-            <Field label="Nome do cardápio">
-              <input name="nome" type="text" placeholder="Ex: Cardápio do Bulking" required style={inputStyle} />
-            </Field>
-            <Field label="Objetivo">
-              <select name="objetivo" style={inputStyle}>
-                <option value="bulking">Bulking 📈</option>
-                <option value="cutting">Cutting 🔥</option>
-                <option value="manutencao">Manutenção ⚖️</option>
-              </select>
-            </Field>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 4 }}>
-              <button type="button" onClick={() => setShowModalCardapio(false)} style={{ ...btnS, ...btnSm }}>Cancelar</button>
-              <button type="submit" disabled={isPending} style={{ ...btnP, ...btnSm }}>Criar</button>
             </div>
           </form>
         </Modal>

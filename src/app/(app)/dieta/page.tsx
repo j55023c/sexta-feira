@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { dbLoadCardapios, dbLoadProtocolo, dbLoadProfile } from '@/lib/db'
+import { dbLoadProfile } from '@/lib/db'
 import DietaClient from './DietaClient'
 
 export default async function DietaPage() {
@@ -8,17 +8,7 @@ export default async function DietaPage() {
   const { data: { user } } = await sb.auth.getUser()
   if (!user) redirect('/auth')
 
-  const [cardapios, protocolo, profile] = await Promise.all([
-    dbLoadCardapios(user.id),
-    dbLoadProtocolo(user.id),
-    dbLoadProfile(user.id),
-  ])
+  const profile = await dbLoadProfile(user.id)
 
-  return (
-    <DietaClient
-      cardapios={cardapios}
-      protocolo={protocolo}
-      profile={profile}
-    />
-  )
+  return <DietaClient hiddenCards={profile?.hidden_cards ?? {}} />
 }
