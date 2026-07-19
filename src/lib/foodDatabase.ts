@@ -1,4 +1,4 @@
-import { TACO, type TacoItem } from '@/lib/taco'
+import { TACO, type TacoItem } from './taco'
 
 export interface Alimento {
   id: string
