@@ -1,8 +1,9 @@
 import { createClient as createBrowser } from '@/lib/supabase/client'
 import { createClient as createServer } from '@/lib/supabase/server'
 import type { EntradaNut, FisicoLog, HistoricoFase } from '@/lib/types'
+import { getLocalDateString } from '@/lib/utils/date'
 
-const today = () => new Date().toISOString().split('T')[0]
+const today = getLocalDateString
 
 // ── NUT LOG ───────────────────────────────────────────────────────────────────
 

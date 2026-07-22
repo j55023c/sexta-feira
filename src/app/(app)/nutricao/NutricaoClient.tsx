@@ -4,10 +4,11 @@ import { useState, useTransition, useRef, useEffect } from 'react'
 import type { EntradaNut, Profile, MealKey } from '@/lib/types'
 import { searchTaco, type TacoItem } from '@/lib/taco'
 import { actionAddEntrada, actionRemoveEntrada } from './actions'
+import { getLocalDateString } from '@/lib/utils/date'
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
-const TODAY = new Date().toISOString().split('T')[0]
+const TODAY = getLocalDateString()
 
 const MEAL_LABELS: Record<MealKey, string> = {
   cafe:   '☕ Café da manhã',
@@ -57,19 +58,34 @@ function fmtDate(d: string) {
   return `${day}/${m}/${y}`
 }
 
+// Arredonda só no fim: somar termos já arredondados ainda acumula erro de
+// ponto flutuante em JS (ex: 12.4 + 8.3 = 20.699999999999996). O bug do
+// "48.800000000000004g" nasce exatamente daí. Solução: somar os valores
+// crus e arredondar uma única vez, no total.
+function round1(n: number) {
+  return Math.round(n * 10) / 10
+}
+
 function calcTotaisDia(entries: EntradaNut[]) {
-  return entries.reduce(
+  const raw = entries.reduce(
     (acc, e) => {
       const f = e.qty / 100
       return {
-        kcal:  acc.kcal  + Math.round(e.kcal  * f),
-        prot:  acc.prot  + Math.round(e.prot  * f * 10) / 10,
-        carbo: acc.carbo + Math.round(e.carbo * f * 10) / 10,
-        gord:  acc.gord  + Math.round(e.gord  * f * 10) / 10,
+        kcal:  acc.kcal  + e.kcal  * f,
+        prot:  acc.prot  + e.prot  * f,
+        carbo: acc.carbo + e.carbo * f,
+        gord:  acc.gord  + e.gord  * f,
       }
     },
     { kcal: 0, prot: 0, carbo: 0, gord: 0 }
   )
+
+  return {
+    kcal:  Math.round(raw.kcal),
+    prot:  round1(raw.prot),
+    carbo: round1(raw.carbo),
+    gord:  round1(raw.gord),
+  }
 }
 
 function calcTotaisMeal(entries: EntradaNut[], meal: MealKey) {
