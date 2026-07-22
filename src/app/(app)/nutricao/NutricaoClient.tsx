@@ -58,25 +58,27 @@ function fmtDate(d: string) {
   return `${day}/${m}/${y}`
 }
 
-// Arredonda só no fim: somar termos já arredondados ainda acumula erro de
-// ponto flutuante em JS (ex: 12.4 + 8.3 = 20.699999999999996). O bug do
-// "48.800000000000004g" nasce exatamente daí. Solução: somar os valores
-// crus e arredondar uma única vez, no total.
+// Cada entrada já guarda o TOTAL daquele item (calculado uma vez em
+// handleAddEntrada, a partir do valor por-100g da TACO × qty/100). Somar de
+// novo multiplicando por e.qty/100 aqui contava a quantidade duas vezes —
+// esse era o bug real por trás da "pequena diferença" no subtotal, maior
+// que simples resíduo de ponto flutuante. Basta somar os valores como estão.
+//
+// O round1 continua existindo por outro motivo: mesmo somando os valores já
+// corretos, JS ainda pode gerar resíduo de float (ex: 12.4 + 8.3 =
+// 20.699999999999996). Arredondar só uma vez, no total final, evita isso.
 function round1(n: number) {
   return Math.round(n * 10) / 10
 }
 
 function calcTotaisDia(entries: EntradaNut[]) {
   const raw = entries.reduce(
-    (acc, e) => {
-      const f = e.qty / 100
-      return {
-        kcal:  acc.kcal  + e.kcal  * f,
-        prot:  acc.prot  + e.prot  * f,
-        carbo: acc.carbo + e.carbo * f,
-        gord:  acc.gord  + e.gord  * f,
-      }
-    },
+    (acc, e) => ({
+      kcal:  acc.kcal  + e.kcal,
+      prot:  acc.prot  + e.prot,
+      carbo: acc.carbo + e.carbo,
+      gord:  acc.gord  + e.gord,
+    }),
     { kcal: 0, prot: 0, carbo: 0, gord: 0 }
   )
 
