@@ -1,10 +1,14 @@
 // Server Component — busca o usuário no servidor antes de renderizar.
 // Isso garante que o email do usuário já chega pronto para a Sidebar,
 // sem nenhum flash de "carregando..." no cliente.
+//
+// A montagem visual (Sidebar + topbar mobile + main) foi extraída para
+// AppShell, um Client Component — é ele quem guarda o estado de
+// aberto/fechado do menu no mobile. Esse layout continua 100% server-side.
 
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import Sidebar from '@/components/layout/Sidebar'
+import AppShell from '@/components/layout/AppShell'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const sb = await createClient()
@@ -15,15 +19,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!user) redirect('/auth')
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg)' }}>
-      <Sidebar userEmail={user.email ?? ''} />
-
-      <main
-        className="flex-1 overflow-y-auto"
-        style={{ padding: '24px 26px' }}
-      >
-        {children}
-      </main>
-    </div>
+    <AppShell userEmail={user.email ?? ''}>
+      {children}
+    </AppShell>
   )
 }

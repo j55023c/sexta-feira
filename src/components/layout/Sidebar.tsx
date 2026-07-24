@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
 import { signOut } from '@/app/auth/actions'
 
 // ── Definição dos itens de navegação ─────────────────────────────────────────
@@ -44,23 +43,36 @@ function getFormattedDate() {
 // ── Componente principal ──────────────────────────────────────────────────────
 interface SidebarProps {
   userEmail: string
+  // Ambos opcionais: em telas >= md a Sidebar ignora esse estado e fica
+  // sempre visível/estática — só o AppShell (mobile) se importa com eles.
+  mobileOpen?: boolean
+  onCloseMobile?: () => void
 }
 
-export default function Sidebar({ userEmail }: SidebarProps) {
+export default function Sidebar({ userEmail, mobileOpen = false, onCloseMobile }: SidebarProps) {
   const pathname = usePathname()
-  // Estado de hover por item — inline style não suporta pseudo-classe :hover,
-  // então controlamos via onMouseEnter/onMouseLeave (mesmo padrão do resto do app).
-  const [hoveredHref, setHoveredHref] = useState<string | null>(null)
 
+  // usePathname() lê a URL atual — ex: '/tarefas'
   const isActive = (href: string) => pathname === href
+
+  function handleNavClick() {
+    // Fecha o drawer ao navegar — sem isso o menu ficaria aberto por cima
+    // da página seguinte no mobile, que é o tipo de bug que ninguém nota
+    // até testar num celular de verdade.
+    onCloseMobile?.()
+  }
 
   return (
     <nav
+      className={`
+        fixed md:static top-0 left-0 z-[150] md:z-auto
+        h-screen transition-transform duration-300 ease-out md:translate-x-0
+        ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}
       style={{
         width: 230,
         flexShrink: 0,
         background: 'var(--sidebar-bg)',
-        height: '100vh',
         display: 'flex',
         flexDirection: 'column',
         overflowY: 'auto',
@@ -71,28 +83,52 @@ export default function Sidebar({ userEmail }: SidebarProps) {
       <div style={{
         padding: '20px 20px 14px',
         borderBottom: '1px solid rgba(255,255,255,.05)',
+        display: 'flex',
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+        gap: 8,
       }}>
-        <div style={{
-          fontSize: 9,
-          letterSpacing: 2.5,
-          textTransform: 'uppercase',
-          color: 'var(--accent2)',
-          fontWeight: 700,
-          marginBottom: 5,
-        }}>
-          Sistema Pessoal
+        <div>
+          <div style={{
+            fontSize: 9,
+            letterSpacing: 2.5,
+            textTransform: 'uppercase',
+            color: 'var(--accent2)',
+            fontWeight: 700,
+            marginBottom: 5,
+          }}>
+            Sistema Pessoal
+          </div>
+          <h2 style={{ fontSize: 19, fontWeight: 800, color: 'var(--sidebar-text)', lineHeight: 1.15 }}>
+            Sexta-<em style={{ fontStyle: 'normal', color: 'var(--accent2)' }}>feira</em>
+          </h2>
+          <div style={{
+            fontSize: 10,
+            color: 'var(--sidebar-muted)',
+            marginTop: 3,
+            fontFamily: 'var(--font-dm-mono)',
+          }}>
+            {getFormattedDate()}
+          </div>
         </div>
-        <h2 style={{ fontSize: 19, fontWeight: 800, color: 'var(--sidebar-text)', lineHeight: 1.15 }}>
-          Sexta-<em style={{ fontStyle: 'normal', color: 'var(--accent2)' }}>feira</em>
-        </h2>
-        <div style={{
-          fontSize: 10,
-          color: 'var(--sidebar-muted)',
-          marginTop: 3,
-          fontFamily: 'var(--font-dm-mono)',
-        }}>
-          {getFormattedDate()}
-        </div>
+
+        {/* Botão fechar — só existe no mobile */}
+        <button
+          onClick={onCloseMobile}
+          aria-label="Fechar menu"
+          className="md:hidden"
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'var(--sidebar-muted)',
+            fontSize: 16,
+            cursor: 'pointer',
+            flexShrink: 0,
+            padding: 2,
+          }}
+        >
+          ✕
+        </button>
       </div>
 
       {/* ── Navegação ── */}
@@ -109,46 +145,35 @@ export default function Sidebar({ userEmail }: SidebarProps) {
             {group.section}
           </div>
 
-          {group.items.map(item => {
-            const active = isActive(item.href)
-            const hovered = hoveredHref === item.href && !active
-
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onMouseEnter={() => setHoveredHref(item.href)}
-                onMouseLeave={() => setHoveredHref(null)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  padding: '8px 18px',
-                  fontSize: 13,
-                  fontWeight: 500,
-                  textDecoration: 'none',
-                  color: active || hovered ? 'var(--sidebar-text)' : '#908880',
-                  borderLeft: active
-                    ? '2px solid var(--accent)'
-                    : hovered
-                      ? '2px solid var(--accent-glow-30)'
-                      : '2px solid transparent',
-                  background: active
-                    ? 'var(--accent-glow-10)'
-                    : hovered
-                      ? 'rgba(255,255,255,.04)'
-                      : 'transparent',
-                  transform: hovered ? 'translateX(3px)' : 'translateX(0)',
-                  transition: 'all .16s ease',
-                }}
-              >
-                <span style={{ fontSize: 14, width: 18, textAlign: 'center', flexShrink: 0 }}>
-                  {item.icon}
-                </span>
-                <span>{item.label}</span>
-              </Link>
-            )
-          })}
+          {group.items.map(item => (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={handleNavClick}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '8px 18px',
+                fontSize: 13,
+                fontWeight: 500,
+                textDecoration: 'none',
+                color: isActive(item.href) ? 'var(--sidebar-text)' : '#908880',
+                borderLeft: isActive(item.href)
+                  ? '2px solid var(--accent)'
+                  : '2px solid transparent',
+                background: isActive(item.href)
+                  ? 'rgba(200,68,26,.1)'
+                  : 'transparent',
+                transition: 'all .14s',
+              }}
+            >
+              <span style={{ fontSize: 14, width: 18, textAlign: 'center', flexShrink: 0 }}>
+                {item.icon}
+              </span>
+              <span>{item.label}</span>
+            </Link>
+          ))}
         </div>
       ))}
 
@@ -162,6 +187,7 @@ export default function Sidebar({ userEmail }: SidebarProps) {
         gap: 6,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {/* Dot de status — sempre verde (sessão única garante isso) */}
           <span style={{
             display: 'inline-block',
             width: 6,
@@ -182,6 +208,7 @@ export default function Sidebar({ userEmail }: SidebarProps) {
             {userEmail}
           </span>
 
+          {/* Logout via Server Action */}
           <form action={signOut}>
             <button
               type="submit"
