@@ -57,11 +57,11 @@ export default function HomeClient({ profile, protocolo, materias, tarefasLivres
   const comPrazo = materias.filter(m => m.prazo).sort((a, b) => a.prazo.localeCompare(b.prazo)).slice(0, 4)
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 16 }}>
+    <div className="grid grid-cols-1 md:grid-cols-[1fr_300px] gap-4">
 
       {/* Coluna esquerda */}
       <div>
-        {/* Card hoje — fundo escuro, círculo decorativo agora tingido pela cor do tema ativo */}
+        {/* Card hoje — fundo escuro, círculo decorativo, idêntico ao original */}
         <div style={{
           background: 'var(--inverse-bg)',
           color: 'var(--inverse-text)',
@@ -71,11 +71,11 @@ export default function HomeClient({ profile, protocolo, materias, tarefasLivres
           position: 'relative',
           overflow: 'hidden',
         }}>
-          {/* Círculo decorativo — era rgba(200,68,26,.15) fixo, agora var(--accent-glow-15) */}
+          {/* Círculo decorativo */}
           <div style={{
             position: 'absolute', top: -40, right: -40,
             width: 180, height: 180, borderRadius: '50%',
-            border: '40px solid var(--accent-glow-15)',
+            border: '40px solid rgba(200,68,26,.15)',
             pointerEvents: 'none',
           }} />
 
@@ -95,7 +95,7 @@ export default function HomeClient({ profile, protocolo, materias, tarefasLivres
 
             <div style={{
               display: 'inline-flex', alignItems: 'center', gap: 5,
-              background: 'var(--accent-glow-20)', border: '1px solid var(--accent-glow-30)',
+              background: 'rgba(200,68,26,.2)', border: '1px solid rgba(200,68,26,.3)',
               borderRadius: 999, padding: '3px 10px', fontSize: 12, fontWeight: 700, color: 'var(--accent2)',
             }}>
               🔥 {profile?.streak_count ?? 0} dia{profile?.streak_count !== 1 ? 's' : ''}

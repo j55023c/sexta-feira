@@ -252,7 +252,7 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
       {/* Tab: Semana tipo */}
       {tab === 'semana' && (
         <div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 8, marginBottom: 18 }}>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-2 mb-[18px]">
             {protocolo.dias.map((d, i) => (
               <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '10px 10px 12px' }}>
                 <div style={{ height: 3, borderRadius: 2, marginBottom: 8, background: TIPO_BAR[d.tipo] ?? TIPO_BAR.free }} />
@@ -296,7 +296,7 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
       {tab === 'metas' && (
         <div>
           <div style={{ ...card, marginBottom: 14 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {[
                 { label: 'Kcal/dia', val: profile?.kcal_meta ?? 2000 },
                 { label: 'Proteína', val: `${profile?.prot_meta ?? 160}g` },
@@ -353,7 +353,11 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
           <div style={{ ...card, marginBottom: 14 }}>
             <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 12 }}>Dias da semana</div>
             {protocolo.dias.map((d, i) => (
-              <div key={i} style={{ display: 'grid', gridTemplateColumns: '70px 1fr 120px', gap: 10, alignItems: 'start', marginBottom: 10, paddingBottom: 10, borderBottom: i < protocolo.dias.length - 1 ? '1px solid var(--border)' : 'none' }}>
+              <div
+                key={i}
+                className="grid grid-cols-1 sm:grid-cols-[70px_1fr_120px] gap-2 sm:gap-[10px] items-start"
+                style={{ marginBottom: 10, paddingBottom: 10, borderBottom: i < protocolo.dias.length - 1 ? '1px solid var(--border)' : 'none' }}
+              >
                 <div style={{ fontSize: 12, fontWeight: 700, paddingTop: 8 }}>{d.dia}</div>
                 <div>
                   <input type="text" value={d.nome} onChange={e => updateDia(i, { nome: e.target.value })} style={{ ...inputStyle, marginBottom: 5 }} />

@@ -254,7 +254,7 @@ export default function NutricaoClient({ nutLog: initialLog, profile }: Props) {
       </p>
 
       {/* Seletor de data */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
         <input
           type="date"
           value={selectedDate}
@@ -476,10 +476,7 @@ export default function NutricaoClient({ nutLog: initialLog, profile }: Props) {
 
               {/* Prévia dos macros */}
               {preview && (
-                <div style={{
-                  display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8,
-                  background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 12,
-                }}>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 12 }}>
                   {[
                     { label: 'Kcal',  val: preview.kcal },
                     { label: 'Prot',  val: preview.prot,  unit: 'g' },
