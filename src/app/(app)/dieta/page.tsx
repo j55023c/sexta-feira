@@ -16,9 +16,9 @@ export default async function DietaPage() {
 
   return (
     <DietaClient
-      hiddenCards={profile?.hidden_cards ?? {}}
       cardapios={cardapios}
       protocolo={protocolo}
+      profile={profile}
     />
   )
 }
