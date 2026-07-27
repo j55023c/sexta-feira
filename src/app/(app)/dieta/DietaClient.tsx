@@ -295,7 +295,7 @@ export default function DietaClient({ cardapios: initialCardapios, protocolo, pr
     ))
     setShowModalEdit(false)
     startTransition(async () => {
-      await actionSaveRefeicao(cardapioAtivo.id, editingMeal, updatedRefeicoes)
+      await actionSaveRefeicao(cardapioAtivo.id, updatedRefeicoes)
     })
   }
 
