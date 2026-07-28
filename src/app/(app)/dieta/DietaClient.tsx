@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import type { Cardapio, Protocolo, Profile, RefeicaoCustom, Fase, MealKey } from '@/lib/types'
+import MobileSheet from '@/components/ui/MobileSheet'
 import {
   actionSaveCardapio,
   actionDeleteCardapio,
@@ -92,27 +93,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       </label>
       {children}
     </div>
-  )
-}
-
-function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
-  return (
-    <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(25,23,20,.55)', backdropFilter: 'blur(3px)', zIndex: 200 }} />
-      <div style={{
-        position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
-        width: wide ? 600 : 460, maxWidth: '95vw', maxHeight: '90vh',
-        background: 'var(--surface)', border: '1px solid var(--border2)',
-        borderRadius: 'var(--radius-lg)', boxShadow: '0 20px 50px rgba(0,0,0,.18)',
-        zIndex: 201, display: 'flex', flexDirection: 'column',
-      }}>
-        <div style={{ padding: '16px 18px 13px', borderBottom: '1px solid var(--border2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-          <span style={{ fontSize: 15, fontWeight: 800 }}>{title}</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 17 }}>✕</button>
-        </div>
-        <div style={{ padding: 18, overflowY: 'auto' }}>{children}</div>
-      </div>
-    </>
   )
 }
 
@@ -444,7 +424,7 @@ export default function DietaClient({ cardapios: initialCardapios, protocolo, pr
               }}>
                 <div style={{ fontSize: 28, marginBottom: 8 }}>🍽</div>
                 <div style={{ fontSize: 13 }}>Nenhum item nesta refeição.</div>
-                <div style={{ fontSize: 11, marginTop: 4 }}>Clique em &quot;Editar refeição&quot; para adicionar.</div>
+                <div style={{ fontSize: 11, marginTop: 4 }}>Clique em "Editar refeição" para adicionar.</div>
               </div>
             ) : (
               <div style={{ marginBottom: 14 }}>
@@ -512,7 +492,11 @@ export default function DietaClient({ cardapios: initialCardapios, protocolo, pr
 
       {/* Modal: Criar cardápio */}
       {showModalCreate && (
-        <Modal title="🍽 Novo cardápio" onClose={() => setShowModalCreate(false)}>
+        <MobileSheet
+          isOpen={showModalCreate}
+          onClose={() => setShowModalCreate(false)}
+          title="🍽 Novo cardápio"
+        >
           <form onSubmit={handleCreateCardapio} style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
             <Field label="Nome do cardápio">
               <input name="nome" type="text" placeholder="Ex: Cutting — Semana 1" required style={inputStyle} />
@@ -529,14 +513,15 @@ export default function DietaClient({ cardapios: initialCardapios, protocolo, pr
               <button type="submit" disabled={isPending} style={{ ...btnP, ...btnSm }}>Criar</button>
             </div>
           </form>
-        </Modal>
+        </MobileSheet>
       )}
 
       {/* Modal: Editar refeição */}
       {showModalEdit && editingMeal && (
-        <Modal
-          title={`✏️ ${MEAL_LABELS[editingMeal]}`}
+        <MobileSheet
+          isOpen={showModalEdit}
           onClose={() => setShowModalEdit(false)}
+          title={`✏️ ${MEAL_LABELS[editingMeal]}`}
           wide
         >
           <div style={{ marginBottom: 12 }}>
@@ -563,7 +548,7 @@ export default function DietaClient({ cardapios: initialCardapios, protocolo, pr
               </button>
             </div>
           </div>
-        </Modal>
+        </MobileSheet>
       )}
     </div>
   )

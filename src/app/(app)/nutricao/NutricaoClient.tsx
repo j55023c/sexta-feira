@@ -5,6 +5,7 @@ import type { EntradaNut, Profile, MealKey } from '@/lib/types'
 import { searchTaco, type TacoItem } from '@/lib/taco'
 import { actionAddEntrada, actionRemoveEntrada } from './actions'
 import { getLocalDateString } from '@/lib/utils/date'
+import MobileSheet from '@/components/ui/MobileSheet'
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
@@ -124,27 +125,6 @@ function MacroBar({ label, val, meta, color }: { label: string; val: number; met
         )}
       </div>
     </div>
-  )
-}
-
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(25,23,20,.55)', backdropFilter: 'blur(3px)', zIndex: 200 }} />
-      <div style={{
-        position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
-        width: 480, maxWidth: '95vw', maxHeight: '90vh',
-        background: 'var(--surface)', border: '1px solid var(--border2)',
-        borderRadius: 'var(--radius-lg)', boxShadow: '0 20px 50px rgba(0,0,0,.18)',
-        zIndex: 201, display: 'flex', flexDirection: 'column',
-      }}>
-        <div style={{ padding: '16px 18px 13px', borderBottom: '1px solid var(--border2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-          <span style={{ fontSize: 15, fontWeight: 800 }}>{title}</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 17 }}>✕</button>
-        </div>
-        <div style={{ padding: 18, overflowY: 'auto' }}>{children}</div>
-      </div>
-    </>
   )
 }
 
@@ -393,7 +373,11 @@ export default function NutricaoClient({ nutLog: initialLog, profile }: Props) {
 
       {/* Modal: Adicionar alimento */}
       {showModal && (
-        <Modal title={`+ ${MEAL_LABELS[modalMeal]}`} onClose={() => setShowModal(false)}>
+        <MobileSheet
+          isOpen={showModal}
+          onClose={() => setShowModal(false)}
+          title={`+ ${MEAL_LABELS[modalMeal]}`}
+        >
           {/* Busca */}
           <div style={{ marginBottom: 12 }}>
             <label style={{ display: 'block', fontSize: 9.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 5 }}>
@@ -439,7 +423,7 @@ export default function NutricaoClient({ nutLog: initialLog, profile }: Props) {
 
           {query.length >= 2 && results.length === 0 && !selected && (
             <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 12, padding: '8px 0' }}>
-              Nenhum alimento encontrado para &quot;{query}&quot;.
+              Nenhum alimento encontrado para "{query}".
             </div>
           )}
 
@@ -503,7 +487,7 @@ export default function NutricaoClient({ nutLog: initialLog, profile }: Props) {
               {isPending ? 'Adicionando...' : 'Adicionar'}
             </button>
           </div>
-        </Modal>
+        </MobileSheet>
       )}
     </div>
   )

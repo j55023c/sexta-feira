@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import type { Materia, TarefaLivre, Tag } from '@/lib/types'
+import MobileSheet from '@/components/ui/MobileSheet'
 import {
   actionAddMateria, actionDeleteMateria, actionToggleTask, actionDeleteTask, actionAddTaskInline,
   actionAddTarefa, actionToggleTarefa, actionDeleteTarefa,
@@ -51,7 +52,6 @@ export default function TarefasClient({ materias: initialMaterias, tarefasLivres
   const [tags, setTags] = useState(initialTags)
 
   // ── Cor de uma tag a partir do nome (texto livre) ────────────────────────
-  // Se a tag foi apagada do catálogo, cai num visual neutro — não quebra nada.
   function getTagStyle(nomeTag: string): { bg: string; color: string } {
     if (!nomeTag) return { bg: 'var(--surface2)', color: 'var(--muted)' }
     const found = tags.find(t => t.nome === nomeTag)
@@ -158,7 +158,7 @@ export default function TarefasClient({ materias: initialMaterias, tarefasLivres
   function renderMaterias() {
     if (!materias.length) return (
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 28, textAlign: 'center', color: 'var(--muted)' }}>
-        Nenhuma matéria. Clique em &quot;+ Nova matéria&quot;.
+        Nenhuma matéria. Clique em "+ Nova matéria".
       </div>
     )
 
@@ -305,7 +305,11 @@ export default function TarefasClient({ materias: initialMaterias, tarefasLivres
 
       {/* Modal: Gerenciar tags */}
       {showModalTags && (
-        <Modal title="Gerenciar tags" onClose={() => setShowModalTags(false)}>
+        <MobileSheet
+          isOpen={showModalTags}
+          onClose={() => setShowModalTags(false)}
+          title="Gerenciar tags"
+        >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16, maxHeight: 220, overflowY: 'auto' }}>
             {tags.length === 0 && (
               <div style={{ fontSize: 12.5, color: 'var(--muted)', padding: '8px 0' }}>Nenhuma tag criada ainda.</div>
@@ -334,12 +338,16 @@ export default function TarefasClient({ materias: initialMaterias, tarefasLivres
             </div>
             <button type="submit" disabled={isPending} style={{ ...btnP, ...btnSm, height: 38 }}>Criar</button>
           </form>
-        </Modal>
+        </MobileSheet>
       )}
 
       {/* Modal: Nova matéria */}
       {showModalMateria && (
-        <Modal title="Nova matéria" onClose={() => setShowModalMateria(false)}>
+        <MobileSheet
+          isOpen={showModalMateria}
+          onClose={() => setShowModalMateria(false)}
+          title="Nova matéria"
+        >
           <form onSubmit={handleAddMateria} style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
             <Field label="Nome"><input name="nome" type="text" placeholder="Ex: Eletricidade básica" required style={inputStyle} /></Field>
             <Field label="Tag">
@@ -357,12 +365,16 @@ export default function TarefasClient({ materias: initialMaterias, tarefasLivres
               <button type="submit" disabled={isPending} style={{ ...btnP, ...btnSm }}>Criar</button>
             </div>
           </form>
-        </Modal>
+        </MobileSheet>
       )}
 
       {/* Modal: Nova tarefa */}
       {showModalTarefa && (
-        <Modal title="Nova tarefa" onClose={() => setShowModalTarefa(false)}>
+        <MobileSheet
+          isOpen={showModalTarefa}
+          onClose={() => setShowModalTarefa(false)}
+          title="Nova tarefa"
+        >
           <form onSubmit={handleAddTarefa} style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
             <Field label="Nome"><input name="nome" type="text" placeholder="Ex: Resolver exercício da apostila" required style={inputStyle} /></Field>
             <Field label="Tag">
@@ -383,7 +395,7 @@ export default function TarefasClient({ materias: initialMaterias, tarefasLivres
               <button type="submit" disabled={isPending} style={{ ...btnP, ...btnSm }}>Adicionar</button>
             </div>
           </form>
-        </Modal>
+        </MobileSheet>
       )}
     </div>
   )
@@ -405,25 +417,5 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <label style={{ display: 'block', fontSize: 9.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 5 }}>{label}</label>
       {children}
     </div>
-  )
-}
-
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(25,23,20,.55)', backdropFilter: 'blur(3px)', zIndex: 200 }} />
-      <div style={{
-        position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
-        width: 460, maxWidth: '95vw', background: 'var(--surface)',
-        border: '1px solid var(--border2)', borderRadius: 'var(--radius-lg)',
-        boxShadow: '0 20px 50px rgba(0,0,0,.18)', zIndex: 201, padding: 0,
-      }}>
-        <div style={{ padding: '16px 18px 13px', borderBottom: '1px solid var(--border2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 15, fontWeight: 800 }}>{title}</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 17 }}>✕</button>
-        </div>
-        <div style={{ padding: 18 }}>{children}</div>
-      </div>
-    </>
   )
 }

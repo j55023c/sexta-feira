@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import type { Protocolo, Profile, HistoricoFase, Fase, DiaProtocolo } from '@/lib/types'
+import MobileSheet from '@/components/ui/MobileSheet'
 import { actionSaveProtocolo, actionMudarFase } from './actions'
 
 // ── Regras por fase (RASCUNHO — revisar antes de considerar definitivo) ──────
@@ -100,26 +101,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <label style={{ display: 'block', fontSize: 9.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 5 }}>{label}</label>
       {children}
     </div>
-  )
-}
-
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(25,23,20,.55)', backdropFilter: 'blur(3px)', zIndex: 200 }} />
-      <div style={{
-        position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
-        width: 460, maxWidth: '95vw', background: 'var(--surface)',
-        border: '1px solid var(--border2)', borderRadius: 'var(--radius-lg)',
-        boxShadow: '0 20px 50px rgba(0,0,0,.18)', zIndex: 201,
-      }}>
-        <div style={{ padding: '16px 18px 13px', borderBottom: '1px solid var(--border2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 15, fontWeight: 800 }}>{title}</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 17 }}>✕</button>
-        </div>
-        <div style={{ padding: 18 }}>{children}</div>
-      </div>
-    </>
   )
 }
 
@@ -387,7 +368,11 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
 
       {/* Modal: Mudar fase */}
       {showModalFase && (
-        <Modal title="🔄 Mudar de fase" onClose={() => setShowModalFase(false)}>
+        <MobileSheet
+          isOpen={showModalFase}
+          onClose={() => setShowModalFase(false)}
+          title="🔄 Mudar de fase"
+        >
           <form onSubmit={handleMudarFase} style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
             <div style={{ borderLeft: '3px solid var(--accent)', padding: '9px 12px', background: 'var(--accent-glow-10)', borderRadius: '0 var(--radius) var(--radius) 0', fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.65, marginBottom: 4 }}>
               A fase atual será arquivada no histórico. As regras da aba Regras trocam automaticamente.
@@ -407,7 +392,7 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
               <button type="submit" disabled={isPending} style={{ ...btnP, ...btnSm }}>Confirmar</button>
             </div>
           </form>
-        </Modal>
+        </MobileSheet>
       )}
     </div>
   )
