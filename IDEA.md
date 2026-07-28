@@ -72,7 +72,7 @@ src/
 
 ## 5. Linha do tempo (resumida)
 
-| Fase | O quê |
+|| Fase | O quê ||
 |---|---|
 | Origem | `index.html` monolítico, PWA single-file, Supabase auth+dados, ~3000 linhas |
 | Bugs de sync | Vários chats resolvendo persistência de dados entre sessões/dispositivos (arquitetura local-first identificada como causa raiz, depois arquitetura de 10 tabelas + `dbSave*/dbLoad*` + sessão única) |
@@ -82,39 +82,48 @@ src/
 | Motor de cardápio (19/07/2026) | Gerador de cardápio via TACO (570 combinações validadas), aba "Meus Cardápios" na Dieta |
 | Roadmap definido | 19 pendências organizadas em prioridade + ~11 blocos de chat |
 | Chat 1 (concluído) | Bug de cálculo na Nutrição (escala duplicada, não era só float) + bug de virada de data (UTC vs local) — corrigidos |
-| **Chat 2 (EM ANDAMENTO — onde você está agora)** | Mobile responsivo |
+| **Chat 2 (concluído)** | Mobile responsivo — sidebar/drawer, grids responsivos, modais/drawers bottom-sheet |
+| **Chat 3 (PRÓXIMO)** | Nutrição (features): visualização macros/gráficos, água, entrada manual |
 
 ---
 
 ## 6. Onde você parou exatamente agora
 
-**Chat 2 do roadmap — mobile responsivo**, dividido em 3 blocos:
+**Chat 2 — CONCLUÍDO** (mobile responsivo: sidebar/drawer, grids, modais/drawers bottom-sheet).
 
-1. ✅ **Sidebar + AppShell** — vira drawer off-canvas abaixo de 768px, com hambúrguer. Concluído.
-2. ✅ **Grids responsivos** — Home, Protocolo (semana de 7 colunas → 2/3/7 conforme tela), Dieta (scroll horizontal nas tabelas de troca), Nutrição (preview de macros 4→2×2). Calculadora não precisou de ajuste. Concluído.
-3. ⏳ **Modais e drawers** — ainda não começado. Hoje todo modal é card centralizado de largura fixa (`460px`/`600px`); o padrão do legado era bottom-sheet full-width no mobile. Falta decidir/aplicar esse padrão em Tarefas, Notas, Protocolo, Nutrição.
+**Chat 3 — PRÓXIMO** (Nutrição features):
+1. Melhorar visualização macros/gráficos (precisa exemplos concretos do que incomoda)
+2. Adicionar água na aba Nutrição (existia no HTML original, não migrou)
+3. Adicionar alimento "na mão" (kcal/macros manuais — complementa busca TACO)
 
-**No meio do bloco 2, dois bugs foram descobertos e corrigidos** (ambos no `DietaClient.tsx`/`dieta/page.tsx`):
-- Eu sobrescrevi o `DietaClient.tsx` com a versão errada (guia estático em vez de gestão de cardápios) — corrigido lendo o arquivo real do projeto.
-- `page.tsx` passava uma prop morta (`hiddenCards`) em vez de `profile` — corrigido.
-- Bug pré-existente no seu código revelado por isso: `actionSaveRefeicao` era chamada com 3 argumentos, mas a assinatura real pede 2 — corrigido.
-
-**Pendências imediatas antes de continuar:**
-1. Confirmar que os arquivos entregues (zip, por causa dos parênteses em `(app)` que quebram `cp` sem aspas) instalaram sem erro.
-2. Rodar `npm run build` local e confirmar zero erro de TypeScript.
-3. Depois disso: bloco 3 (modais/drawers) fecha o Chat 2.
+Pendências antes de iniciar Chat 3:
+1. Definir escopo visual do item 1 (você vai dar exemplos)
+2. Itens 2 e 3 têm base no código atual — prontos pra codar
 
 ---
 
-## 7. Backlog pendente (fora do que já está em andamento)
+## 7. Backlog pendente (organizado por chat)
 
-- Seletor de tema: falta aplicar `data-theme` no servidor a partir de `profile.tema` antes do render (hoje há flash do tema errado ao carregar).
-- Sistema de sessão única (`active_sessions`) — race condition não resolvida, ainda não validada em uso real desde a migração.
-- Bulking/manutenção sem cardápio de referência fixo no guia estático (o gerador cobre as três fases, mas o guia manual só tem cutting).
-- `actionToggleHiddenCard`/`actionShowAllHidden` existem em `actions.ts` mas não são chamadas por lugar nenhum — candidato a dead code ou funcionalidade esquecida.
-- Repaginação visual geral pós-migração — escopo ainda não definido.
-- Itens de horizonte mais distante, sem escopo: aba de suplementação, tabela progressiva no Protocolo, fluxo de onboarding com TDEE, Protocolo com treino customizável (upper/lower), aba de Gráficos (desempenho + histórico), gamificação da comparação de peso.
-- Do roadmap original de 19 itens só os de bug (Chat 1) e mobile (Chat 2) foram atacados — o restante ainda não tem chat definido nesse consolidado (o PDF completo com a divisão dos 11 chats está referenciado, mas não veio nos uploads que recebi).
+**Chat 3 — Nutrição (features)**
+- [ ] Visualização macros/gráficos (precisa exemplos)
+- [ ] Água na aba Nutrição (existia no HTML original, não migrou)
+- [ ] Alimento manual "na mão" (kcal/macros diretos — complementa TACO)
+
+**Chat 4 — Tema & Sessão**
+- [ ] Seletor de tema: aplicar `data-theme` no server a partir de `profile.tema` (evita flash)
+- [ ] Sessão única (`active_sessions`) — race condition não resolvida
+
+**Chat 5 — Dieta (guia estático)**
+- [ ] Bulking/manutenção no guia (só cutting existe; gerador já cobre as 3)
+- [ ] `actionToggleHiddenCard`/`actionShowAllHidden` — dead code ou feature esquecida?
+
+**Chat 6 — Repaginação visual**
+- [ ] Escopo a definir
+
+**Chat 7+ — Horizonte distante** (sem escopo definido)
+- Aba suplementação, tabela progressiva no Protocolo, onboarding TDEE, Protocolo customizável (upper/lower), aba Gráficos, gamificação peso
+
+Do roadmap original de 19 itens: Chat 1 (bugs), Chat 2 (mobile) ✅ — restante aguarda chats definidos.
 
 ---
 
@@ -123,3 +132,13 @@ src/
 - Nunca reescrever um `*Client.tsx` de memória sem ler o real primeiro — mount plano do sandbox faz `page.tsx`/`actions.ts` colidirem entre rotas, então esses dois **sempre** precisam ser colados por você quando o bug envolve eles.
 - `(app)` com parênteses no caminho quebra `cp` sem aspas no shell — se der erro de "instalação", perguntar primeiro **onde** falhou (VSCode, terminal, ou download do chat) antes de supor.
 - Diffs que "explodem" podem ser só CRLF vs LF, não mudança de conteúdo — normalizar antes de alarmar.
+
+---
+
+## 9. Fechamentos de chat (histórico)
+
+### Sexta-feira — 28/07/2026 17:30
+STATUS: Chat 2 completo — mobile responsivo finalizado
+FEITO: Sidebar/drawer off-canvas (<768px), grids responsivos (Home, Protocolo, Dieta, Nutrição), modais/drawers bottom-sheet via MobileSheet compartilhado (Tarefas, Protocolo, Dieta, Nutrição). Build limpo.
+PRÓXIMO: Chat 3 — Nutrição features (visualização macros/gráficos, água, entrada manual)
+PENDÊNCIA: Definir exemplos concretos pro item 1 (visualização); itens 2 e 3 prontos pra codar
