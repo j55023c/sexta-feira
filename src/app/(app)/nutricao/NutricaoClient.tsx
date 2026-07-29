@@ -3,7 +3,7 @@
 import { useState, useTransition, useRef, useEffect } from 'react'
 import type { EntradaNut, Profile, MealKey } from '@/lib/types'
 import { searchTaco, type TacoItem } from '@/lib/taco'
-import { actionAddEntrada, actionRemoveEntrada } from './actions'
+import { actionAddEntrada, actionRemoveEntrada, actionAddWater, actionRemoveWater } from './actions'
 import { getLocalDateString } from '@/lib/utils/date'
 import MobileSheet from '@/components/ui/MobileSheet'
 
@@ -133,16 +133,19 @@ function MacroBar({ label, val, meta, color }: { label: string; val: number; met
 interface Props {
   nutLog: Record<string, EntradaNut[]>
   profile: Profile | null
+  waterLog: Record<string, number>
 }
 
 // ── Componente principal ──────────────────────────────────────────────────────
 
-export default function NutricaoClient({ nutLog: initialLog, profile }: Props) {
+export default function NutricaoClient({ nutLog: initialLog, profile, waterLog: initialWaterLog }: Props) {
   const [nutLog, setNutLog] = useState(initialLog)
+  const [waterLog, setWaterLog] = useState(initialWaterLog)
   const [selectedDate, setSelectedDate] = useState(TODAY)
   const [activeMeal, setActiveMeal] = useState<MealKey>('cafe')
   const [showModal, setShowModal] = useState(false)
   const [modalMeal, setModalMeal] = useState<MealKey>('cafe')
+  const [modalMode, setModalMode] = useState<'busca' | 'manual'>('busca')
 
   // Estado do buscador TACO dentro do modal
   const [query, setQuery] = useState('')
@@ -150,11 +153,21 @@ export default function NutricaoClient({ nutLog: initialLog, profile }: Props) {
   const [selected, setSelected] = useState<TacoItem | null>(null)
   const [qty, setQty] = useState(100)
 
+  // Estado do alimento manual
+  const [manualNome, setManualNome] = useState('')
+  const [manualKcal, setManualKcal] = useState(0)
+  const [manualProt, setManualProt] = useState(0)
+  const [manualCarbo, setManualCarbo] = useState(0)
+  const [manualGord, setManualGord] = useState(0)
+  const [manualQty, setManualQty] = useState(100)
+
   const [isPending, startTransition] = useTransition()
   const searchRef = useRef<HTMLInputElement>(null)
 
   const entriesDia: EntradaNut[] = nutLog[selectedDate] ?? []
   const totaisDia = calcTotaisDia(entriesDia)
+  const waterToday = waterLog[selectedDate] ?? 0
+  const waterMeta = profile?.peso ? Math.round(profile.peso * 35) : 2500 // 35ml/kg
 
   // Foca no campo de busca quando modal abre
   useEffect(() => {
@@ -164,6 +177,13 @@ export default function NutricaoClient({ nutLog: initialLog, profile }: Props) {
       setResults([])
       setSelected(null)
       setQty(100)
+      setModalMode('busca')
+      setManualNome('')
+      setManualKcal(0)
+      setManualProt(0)
+      setManualCarbo(0)
+      setManualGord(0)
+      setManualQty(100)
     }
   }, [showModal])
 
@@ -207,22 +227,50 @@ export default function NutricaoClient({ nutLog: initialLog, profile }: Props) {
   }
 
   function handleRemoveEntrada(index: number) {
-    const newEntries = entriesDia.filter((_, i) => i !== index)
-    setNutLog(prev => ({ ...prev, [selectedDate]: newEntries }))
-    startTransition(async () => {
-      await actionRemoveEntrada(selectedDate, index, entriesDia)
-    })
-  }
+      const newEntries = entriesDia.filter((_, i) => i !== index)
+      setNutLog(prev => ({ ...prev, [selectedDate]: newEntries }))
+      startTransition(async () => {
+        await actionRemoveEntrada(selectedDate, index, entriesDia)
+      })
+    }
 
-  // Macros da prévia no modal (baseado em qty selecionada)
-  const preview = selected
-    ? {
-        kcal:  Math.round(selected.kcal  * qty / 100),
-        prot:  Math.round(selected.prot  * qty / 100 * 10) / 10,
-        carbo: Math.round(selected.carbo * qty / 100 * 10) / 10,
-        gord:  Math.round(selected.gord  * qty / 100 * 10) / 10,
+    function handleAddManual() {
+      if (!manualNome.trim() || (manualKcal === 0 && manualProt === 0 && manualCarbo === 0 && manualGord === 0)) return
+
+      const entrada: EntradaNut = {
+        nome: manualNome.trim(),
+        kcal: manualKcal,
+        prot: manualProt,
+        carbo: manualCarbo,
+        gord: manualGord,
+        meal: modalMeal,
+        qty: manualQty,
       }
-    : null
+
+      const newEntries = [...entriesDia, entrada]
+      setNutLog(prev => ({ ...prev, [selectedDate]: newEntries }))
+      setManualNome('')
+      setManualKcal(0)
+      setManualProt(0)
+      setManualCarbo(0)
+      setManualGord(0)
+      setManualQty(100)
+      setShowModal(false)
+
+      startTransition(async () => {
+        await actionAddEntrada(selectedDate, entrada, entriesDia)
+      })
+    }
+
+    // Macros da prévia no modal (baseado em qty selecionada)
+    const preview = selected
+      ? {
+          kcal:  Math.round(selected.kcal  * qty / 100),
+          prot:  Math.round(selected.prot  * qty / 100 * 10) / 10,
+          carbo: Math.round(selected.carbo * qty / 100 * 10) / 10,
+          gord:  Math.round(selected.gord  * qty / 100 * 10) / 10,
+        }
+      : null
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -252,18 +300,93 @@ export default function NutricaoClient({ nutLog: initialLog, profile }: Props) {
         </span>
       </div>
 
-      {/* Resumo de macros do dia */}
-      <div style={{ ...card, marginBottom: 16 }}>
-        <Divider label="Macros do dia" />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <MacroBar label="Kcal"  val={totaisDia.kcal}  meta={profile?.kcal_meta}  color="var(--accent)" />
-          <MacroBar label="Prot"  val={totaisDia.prot}  meta={profile?.prot_meta}  color="#3b82f6" />
-          <MacroBar label="Carbo" val={totaisDia.carbo} meta={profile?.carbo_meta} color="#f59e0b" />
-          <MacroBar label="Gord"  val={totaisDia.gord}  meta={profile?.gord_meta}  color="#8b5cf6" />
-        </div>
-      </div>
+      {/* Barras de progresso (compactas) */}
+                              <div style={{ ...card, marginBottom: 16 }}>
+                                <Divider label="Detalhe" />
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                  <MacroBar label="Kcal"  val={totaisDia.kcal}  meta={profile?.kcal_meta}  color="var(--accent)" />
+                                  <MacroBar label="Prot"  val={totaisDia.prot}  meta={profile?.prot_meta}  color="#3b82f6" />
+                                  <MacroBar label="Carbo" val={totaisDia.carbo} meta={profile?.carbo_meta} color="#f59e0b" />
+                                  <MacroBar label="Gord"  val={totaisDia.gord}  meta={profile?.gord_meta}  color="#8b5cf6" />
+                                </div>
+                              </div>
 
-      {/* Tabs de refeição */}
+                              {/* Água */}
+                        <div style={{ ...card, marginBottom: 16 }}>
+                          <Divider label="Água" />
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                            <div style={{
+                              width: 72, height: 72, borderRadius: '50%',
+                              background: 'conic-gradient(var(--accent) calc(var(--pct,0)*3.6deg), var(--border2) 0deg)',
+                              position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              boxShadow: 'inset 0 0 0 6px var(--surface), 0 2px 8px rgba(0,0,0,0.1)',
+                            }}>
+                              <div style={{
+                                                              width: 54, height: 54, borderRadius: '50%',
+                                                              background: 'var(--surface)', display: 'flex', flexDirection: 'column',
+                                                              alignItems: 'center', justifyContent: 'center',
+                                                            }}>
+                                                              <span style={{
+                                                                fontSize: 10, fontWeight: 700, fontFamily: 'var(--font-syne)',
+                                                                color: 'var(--text)',
+                                                              }}>
+                                                                {waterMeta > 0 ? Math.min(100, Math.round((waterToday / waterMeta) * 100)) : 0}%
+                                                              </span>
+                                                              <span style={{ fontSize: 8, color: 'var(--muted)', fontFamily: 'var(--font-dm-mono)' }}>
+                                                                {waterToday}ml
+                                                              </span>
+                                                            </div>
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: .8 }}>
+                                  Hidratação
+                                </span>
+                                <span style={{ fontSize: 12, fontFamily: 'var(--font-dm-mono)', fontWeight: 700, color: 'var(--text)' }}>
+                                  {waterToday} / {waterMeta}ml
+                                </span>
+                              </div>
+                              <div style={{ height: 8, borderRadius: 4, background: 'var(--border2)', overflow: 'hidden' }}>
+                                <div style={{
+                                  height: '100%', width: `${waterMeta > 0 ? Math.min(100, Math.round((waterToday / waterMeta) * 100)) : 0}%`,
+                                  borderRadius: 4, background: 'var(--accent)', transition: 'width .4s'
+                                }} />
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              <button
+                                onClick={async () => {
+                                  const res = await actionAddWater(selectedDate, 200, waterToday)
+                                  if (!res.error && res.ml !== undefined) {
+                                    setWaterLog(prev => ({ ...prev, [selectedDate]: res.ml! }))
+                                  }
+                                }}
+                                style={{
+                                  ...btnP, ...btnSm, padding: '8px 12px', fontSize: 11,
+                                  background: 'var(--accent)', minWidth: 60,
+                                }}
+                              >
+                                +200ml
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  const res = await actionRemoveWater(selectedDate, waterToday)
+                                  if (!res.error && res.ml !== undefined) {
+                                    setWaterLog(prev => ({ ...prev, [selectedDate]: res.ml! }))
+                                  }
+                                }}
+                                style={{
+                                  ...btnS, ...btnSm, padding: '8px 12px', fontSize: 11,
+                                  border: '1px solid var(--border2)', minWidth: 60,
+                                }}
+                              >
+                                -200ml
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                  {/* Tabs de refeição */}
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border2)', marginBottom: 18, overflowX: 'auto' }}>
         {MEAL_KEYS.map(key => {
           const count = entriesDia.filter(e => e.meal === key).length
@@ -372,123 +495,262 @@ export default function NutricaoClient({ nutLog: initialLog, profile }: Props) {
       </div>
 
       {/* Modal: Adicionar alimento */}
-      {showModal && (
-        <MobileSheet
-          isOpen={showModal}
-          onClose={() => setShowModal(false)}
-          title={`+ ${MEAL_LABELS[modalMeal]}`}
-        >
-          {/* Busca */}
-          <div style={{ marginBottom: 12 }}>
-            <label style={{ display: 'block', fontSize: 9.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 5 }}>
-              Buscar alimento (TACO)
-            </label>
-            <input
-              ref={searchRef}
-              type="text"
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder="Ex: frango, arroz, ovo..."
-              style={inputStyle}
-            />
-          </div>
-
-          {/* Resultados da busca */}
-          {results.length > 0 && !selected && (
-            <div style={{
-              border: '1px solid var(--border2)', borderRadius: 'var(--radius)',
-              maxHeight: 220, overflowY: 'auto', marginBottom: 12,
-            }}>
-              {results.map(item => (
-                <div
-                  key={item.id}
-                  onClick={() => setSelected(item)}
-                  style={{
-                    padding: '10px 14px', cursor: 'pointer', fontSize: 13,
-                    borderBottom: '1px solid var(--border)',
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    transition: 'background .1s',
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface2)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                >
-                  <span style={{ fontWeight: 600 }}>{item.nome}</span>
-                  <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-dm-mono)' }}>
-                    {item.kcal} kcal/100g
-                  </span>
+            {showModal && (
+              <MobileSheet
+                isOpen={showModal}
+                onClose={() => setShowModal(false)}
+                title={`+ ${MEAL_LABELS[modalMeal]}`}
+              >
+                {/* Tabs: Buscar vs Manual */}
+                <div style={{ display: 'flex', borderBottom: '1px solid var(--border2)', marginBottom: 12 }}>
+                  <button
+                    onClick={() => setModalMode('busca')}
+                    style={{
+                      flex: 1, padding: '10px 0', background: 'none', border: 'none',
+                      fontFamily: 'var(--font-syne)', fontSize: 12, fontWeight: 600,
+                      cursor: 'pointer', color: modalMode === 'busca' ? 'var(--accent)' : 'var(--muted)',
+                      borderBottom: modalMode === 'busca' ? '2px solid var(--accent)' : '2px solid transparent',
+                    }}
+                  >
+                    🔍 Buscar (TACO)
+                  </button>
+                  <button
+                    onClick={() => setModalMode('manual')}
+                    style={{
+                      flex: 1, padding: '10px 0', background: 'none', border: 'none',
+                      fontFamily: 'var(--font-syne)', fontSize: 12, fontWeight: 600,
+                      cursor: 'pointer', color: modalMode === 'manual' ? 'var(--accent)' : 'var(--muted)',
+                      borderBottom: modalMode === 'manual' ? '2px solid var(--accent)' : '2px solid transparent',
+                    }}
+                  >
+                    ✏️ Manual
+                  </button>
                 </div>
-              ))}
-            </div>
-          )}
 
-          {query.length >= 2 && results.length === 0 && !selected && (
-            <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 12, padding: '8px 0' }}>
-              Nenhum alimento encontrado para "{query}".
-            </div>
-          )}
-
-          {/* Alimento selecionado + quantidade */}
-          {selected && (
-            <div style={{ marginBottom: 16 }}>
-              <div style={{
-                background: 'var(--surface2)', borderRadius: 'var(--radius)',
-                padding: '10px 14px', marginBottom: 12,
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              }}>
-                <span style={{ fontSize: 13, fontWeight: 700 }}>{selected.nome}</span>
-                <button
-                  onClick={() => { setSelected(null); setQuery('') }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 13 }}
-                >
-                  ✕
-                </button>
-              </div>
-
-              <div style={{ marginBottom: 12 }}>
-                <label style={{ display: 'block', fontSize: 9.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 5 }}>
-                  Quantidade (g)
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  max={2000}
-                  value={qty}
-                  onChange={e => setQty(Number(e.target.value))}
-                  style={{ ...inputStyle, maxWidth: 140 }}
-                />
-              </div>
-
-              {/* Prévia dos macros */}
-              {preview && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 12 }}>
-                  {[
-                    { label: 'Kcal',  val: preview.kcal },
-                    { label: 'Prot',  val: preview.prot,  unit: 'g' },
-                    { label: 'Carbo', val: preview.carbo, unit: 'g' },
-                    { label: 'Gord',  val: preview.gord,  unit: 'g' },
-                  ].map(m => (
-                    <div key={m.label} style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 3 }}>{m.label}</div>
-                      <div style={{ fontSize: 18, fontWeight: 800, fontFamily: 'var(--font-dm-mono)' }}>{m.val}{m.unit ?? ''}</div>
+                {modalMode === 'busca' && (
+                  <>
+                    {/* Busca */}
+                    <div style={{ marginBottom: 12 }}>
+                      <label style={{ display: 'block', fontSize: 9.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 5 }}>
+                        Buscar alimento (TACO)
+                      </label>
+                      <input
+                        ref={searchRef}
+                        type="text"
+                        value={query}
+                        onChange={e => setQuery(e.target.value)}
+                        placeholder="Ex: frango, arroz, ovo..."
+                        style={inputStyle}
+                      />
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 4 }}>
-            <button onClick={() => setShowModal(false)} style={{ ...btnS, ...btnSm }}>Cancelar</button>
-            <button
-              onClick={handleAddEntrada}
-              disabled={!selected || isPending}
-              style={{ ...btnP, ...btnSm, opacity: !selected ? .5 : 1, cursor: !selected ? 'not-allowed' : 'pointer' }}
-            >
-              {isPending ? 'Adicionando...' : 'Adicionar'}
-            </button>
-          </div>
-        </MobileSheet>
-      )}
+                    {/* Resultados da busca */}
+                    {results.length > 0 && !selected && (
+                      <div style={{
+                        border: '1px solid var(--border2)', borderRadius: 'var(--radius)',
+                        maxHeight: 220, overflowY: 'auto', marginBottom: 12,
+                      }}>
+                        {results.map(item => (
+                          <div
+                            key={item.id}
+                            onClick={() => setSelected(item)}
+                            style={{
+                              padding: '10px 14px', cursor: 'pointer', fontSize: 13,
+                              borderBottom: '1px solid var(--border)',
+                              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                              transition: 'background .1s',
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface2)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                          >
+                            <span style={{ fontWeight: 600 }}>{item.nome}</span>
+                            <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-dm-mono)' }}>
+                              {item.kcal} kcal/100g
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {query.length >= 2 && results.length === 0 && !selected && (
+                      <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 12, padding: '8px 0' }}>
+                        Nenhum alimento encontrado para "{query}".
+                      </div>
+                    )}
+
+                    {/* Alimento selecionado + quantidade */}
+                    {selected && (
+                      <div style={{ marginBottom: 16 }}>
+                        <div style={{
+                          background: 'var(--surface2)', borderRadius: 'var(--radius)',
+                          padding: '10px 14px', marginBottom: 12,
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        }}>
+                          <span style={{ fontSize: 13, fontWeight: 700 }}>{selected.nome}</span>
+                          <button
+                            onClick={() => { setSelected(null); setQuery('') }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 13 }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+
+                        <div style={{ marginBottom: 12 }}>
+                          <label style={{ display: 'block', fontSize: 9.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 5 }}>
+                            Quantidade (g)
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={2000}
+                            value={qty}
+                            onChange={e => setQty(Number(e.target.value))}
+                            style={{ ...inputStyle, maxWidth: 140 }}
+                          />
+                        </div>
+
+                        {/* Prévia dos macros */}
+                        {preview && (
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 12 }}>
+                            {[
+                              { label: 'Kcal',  val: preview.kcal },
+                              { label: 'Prot',  val: preview.prot,  unit: 'g' },
+                              { label: 'Carbo', val: preview.carbo, unit: 'g' },
+                              { label: 'Gord',  val: preview.gord,  unit: 'g' },
+                            ].map(m => (
+                              <div key={m.label} style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 3 }}>{m.label}</div>
+                                <div style={{ fontSize: 18, fontWeight: 800, fontFamily: 'var(--font-dm-mono)' }}>{m.val}{m.unit ?? ''}</div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {modalMode === 'manual' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 9.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 5 }}>
+                        Nome do alimento
+                      </label>
+                      <input
+                        type="text"
+                        value={manualNome}
+                        onChange={e => setManualNome(e.target.value)}
+                        placeholder="Ex: Whey protein, banana com pasta de amendoim..."
+                        style={inputStyle}
+                      />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: 9.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 5 }}>
+                          Kcal
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={5000}
+                          value={manualKcal}
+                          onChange={e => setManualKcal(Number(e.target.value))}
+                          style={inputStyle}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: 9.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 5 }}>
+                          Proteína (g)
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={500}
+                          step={0.1}
+                          value={manualProt}
+                          onChange={e => setManualProt(Number(e.target.value))}
+                          style={inputStyle}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: 9.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 5 }}>
+                          Carboidrato (g)
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={500}
+                          step={0.1}
+                          value={manualCarbo}
+                          onChange={e => setManualCarbo(Number(e.target.value))}
+                          style={inputStyle}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: 9.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 5 }}>
+                          Gordura (g)
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={500}
+                          step={0.1}
+                          value={manualGord}
+                          onChange={e => setManualGord(Number(e.target.value))}
+                          style={inputStyle}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: 9.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 5 }}>
+                        Quantidade (g) — opcional, só para referência
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={2000}
+                        value={manualQty}
+                        onChange={e => setManualQty(Number(e.target.value))}
+                        style={{ ...inputStyle, maxWidth: 140 }}
+                      />
+                    </div>
+
+                    {(manualKcal > 0 || manualProt > 0 || manualCarbo > 0 || manualGord > 0) && (
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 12 }}>
+                        {[
+                          { label: 'Kcal',  val: manualKcal },
+                          { label: 'Prot',  val: manualProt,  unit: 'g' },
+                          { label: 'Carbo', val: manualCarbo, unit: 'g' },
+                          { label: 'Gord',  val: manualGord,  unit: 'g' },
+                        ].map(m => (
+                          <div key={m.label} style={{ textAlign: 'center' }}>
+                            <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 3 }}>{m.label}</div>
+                            <div style={{ fontSize: 18, fontWeight: 800, fontFamily: 'var(--font-dm-mono)' }}>{m.val}{m.unit ?? ''}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 4 }}>
+                  <button onClick={() => setShowModal(false)} style={{ ...btnS, ...btnSm }}>Cancelar</button>
+                  <button
+                    onClick={modalMode === 'busca' ? handleAddEntrada : handleAddManual}
+                    disabled={modalMode === 'busca' ? (!selected || isPending) : (!manualNome.trim() || (manualKcal === 0 && manualProt === 0 && manualCarbo === 0 && manualGord === 0) || isPending)}
+                    style={{
+                      ...btnP, ...btnSm,
+                      opacity: (modalMode === 'busca' ? (!selected ? .5 : 1) : (!manualNome.trim() || (manualKcal === 0 && manualProt === 0 && manualCarbo === 0 && manualGord === 0) ? .5 : 1)),
+                      cursor: (modalMode === 'busca' ? (!selected ? 'not-allowed' : 'pointer') : (!manualNome.trim() || (manualKcal === 0 && manualProt === 0 && manualCarbo === 0 && manualGord === 0) ? 'not-allowed' : 'pointer'))
+                    }}
+                  >
+                    {isPending ? 'Adicionando...' : 'Adicionar'}
+                  </button>
+                </div>
+              </MobileSheet>
+            )}
     </div>
   )
 }

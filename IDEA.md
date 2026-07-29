@@ -82,8 +82,8 @@ src/
 | Motor de cardápio (19/07/2026) | Gerador de cardápio via TACO (570 combinações validadas), aba "Meus Cardápios" na Dieta |
 | Roadmap definido | 19 pendências organizadas em prioridade + ~11 blocos de chat |
 | Chat 1 (concluído) | Bug de cálculo na Nutrição (escala duplicada, não era só float) + bug de virada de data (UTC vs local) — corrigidos |
-| **Chat 2 (concluído)** | Mobile responsivo — sidebar/drawer, grids responsivos, modais/drawers bottom-sheet |
-| **Chat 3 (PRÓXIMO)** | Nutrição (features): visualização macros/gráficos, água, entrada manual |
+|| **Chat 2 (concluído)** | Mobile responsivo — sidebar/drawer, grids responsivos, modais/drawers bottom-sheet ||
+|| **Chat 3 (concluído)** | Nutrição (features): barras de macros compactas, água (log + UI), alimento manual "na mão" ||
 
 ---
 
@@ -91,23 +91,23 @@ src/
 
 **Chat 2 — CONCLUÍDO** (mobile responsivo: sidebar/drawer, grids, modais/drawers bottom-sheet).
 
-**Chat 3 — PRÓXIMO** (Nutrição features):
-1. Melhorar visualização macros/gráficos (precisa exemplos concretos do que incomoda)
-2. Adicionar água na aba Nutrição (existia no HTML original, não migrou)
-3. Adicionar alimento "na mão" (kcal/macros manuais — complementa busca TACO)
+**Chat 3 — CONCLUÍDO** (Nutrição features):
+1. Barras de macros compactas (Kcal/Prot/Carbo/Gord com meta)
+2. Água na aba Nutrição — log `water_log` + UI (ring + barra + botões ±200ml)
+3. Alimento manual "na mão" — aba no modal com campos Nome/Kcal/Prot/Carbo/Gord/Qty
 
-Pendências antes de iniciar Chat 3:
-1. Definir escopo visual do item 1 (você vai dar exemplos)
-2. Itens 2 e 3 têm base no código atual — prontos pra codar
+**Chat 4 — PRÓXIMO** (Tema & Sessão):
+1. Seletor de tema: aplicar `data-theme` no server a partir de `profile.tema` (evita flash)
+2. Sessão única (`active_sessions`) — race condition não resolvida
 
 ---
 
 ## 7. Backlog pendente (organizado por chat)
 
-**Chat 3 — Nutrição (features)**
-- [ ] Visualização macros/gráficos (precisa exemplos)
-- [ ] Água na aba Nutrição (existia no HTML original, não migrou)
-- [ ] Alimento manual "na mão" (kcal/macros diretos — complementa TACO)
+**Chat 3 — Nutrição (features) ✅**
+- [x] Barras de macros compactas (Kcal/Prot/Carbo/Gord com meta)
+- [x] Água na aba Nutrição (existia no HTML original, não migrou) — log `water_log` + UI
+- [x] Alimento manual "na mão" (kcal/macros diretos — complementa TACO) — aba no modal
 
 **Chat 4 — Tema & Sessão**
 - [ ] Seletor de tema: aplicar `data-theme` no server a partir de `profile.tema` (evita flash)
@@ -137,8 +137,8 @@ Do roadmap original de 19 itens: Chat 1 (bugs), Chat 2 (mobile) ✅ — restante
 
 ## 9. Fechamentos de chat (histórico)
 
-### Sexta-feira — 28/07/2026 17:30
-STATUS: Chat 2 completo — mobile responsivo finalizado
-FEITO: Sidebar/drawer off-canvas (<768px), grids responsivos (Home, Protocolo, Dieta, Nutrição), modais/drawers bottom-sheet via MobileSheet compartilhado (Tarefas, Protocolo, Dieta, Nutrição). Build limpo.
-PRÓXIMO: Chat 3 — Nutrição features (visualização macros/gráficos, água, entrada manual)
-PENDÊNCIA: Definir exemplos concretos pro item 1 (visualização); itens 2 e 3 prontos pra codar
+### Sexta-feira — 28/07/2026 18:45
+STATUS: Chat 3 completo — Nutrição features finalizadas
+FEITO: Barras macros compactas (Detalhe), Água (log water_log + UI ring/barra + botões ±200ml), Alimento manual (aba "Manual" no modal com Kcal/Prot/Carbo/Gord/Qty). MacroRings removido (ficará pra repaginação visual). Build limpo.
+PRÓXIMO: Chat 4 — Tema & Sessão (data-theme server-side, race condition active_sessions)
+PENDÊNCIA: Nenhuma

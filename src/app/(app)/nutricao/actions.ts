@@ -58,3 +58,38 @@ export async function actionRemoveEntrada(date: string, index: number, currentEn
   revalidatePath('/nutricao')
   revalidatePath('/home')
 }
+
+// ── ÁGUA ──────────────────────────────────────────────────────────────────────
+export async function actionAddWater(date: string, ml: number, currentMl: number) {
+  const { sb, user } = await getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const newMl = currentMl + ml
+
+  const { error } = await sb.from('water_log').upsert(
+    { user_id: user.id, date, ml: newMl, updated_at: new Date().toISOString() },
+    { onConflict: 'user_id,date' }
+  )
+  if (error) return { error: error.message }
+
+  revalidatePath('/nutricao')
+  revalidatePath('/home')
+  return { ml: newMl }
+}
+
+export async function actionRemoveWater(date: string, currentMl: number) {
+  const { sb, user } = await getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const newMl = Math.max(0, currentMl - 200)
+
+  const { error } = await sb.from('water_log').upsert(
+    { user_id: user.id, date, ml: newMl, updated_at: new Date().toISOString() },
+    { onConflict: 'user_id,date' }
+  )
+  if (error) return { error: error.message }
+
+  revalidatePath('/nutricao')
+  revalidatePath('/home')
+  return { ml: newMl }
+}
