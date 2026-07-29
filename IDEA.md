@@ -82,11 +82,9 @@ src/
 | Motor de cardápio (19/07/2026) | Gerador de cardápio via TACO (570 combinações validadas), aba "Meus Cardápios" na Dieta |
 | Roadmap definido | 19 pendências organizadas em prioridade + ~11 blocos de chat |
 | Chat 1 (concluído) | Bug de cálculo na Nutrição (escala duplicada, não era só float) + bug de virada de data (UTC vs local) — corrigidos |
-|| **Chat 2 (concluído)** | Mobile responsivo — sidebar/drawer, grids responsivos, modais/drawers bottom-sheet ||
-|| **Chat 3 (concluído)** | Nutrição (features): barras de macros compactas, água (log + UI), alimento manual "na mão" ||
+|| Chat 3 (concluído) | Nutrição (features): barras de macros compactas, água (log + UI), alimento manual "na mão" ||
 
 ---
-
 ## 6. Onde você parou exatamente agora
 
 **Chat 2 — CONCLUÍDO** (mobile responsivo: sidebar/drawer, grids, modais/drawers bottom-sheet).
@@ -96,9 +94,9 @@ src/
 2. Água na aba Nutrição — log `water_log` + UI (ring + barra + botões ±200ml)
 3. Alimento manual "na mão" — aba no modal com campos Nome/Kcal/Prot/Carbo/Gord/Qty
 
-**Chat 4 — PRÓXIMO** (Tema & Sessão):
-1. Seletor de tema: aplicar `data-theme` no server a partir de `profile.tema` (evita flash)
-2. Sessão única (`active_sessions`) — race condition não resolvida
+**Chat 4 — PRÓXIMO** (Físico - funcionalidades):
+1. Melhorar visualização da aba Físico (precisa exemplos concretos)
+2. Editar/adicionar campos e melhorar o módulo Físico como um todo (escopo amplo, quebrar em sub-itens)
 
 ---
 
@@ -109,11 +107,15 @@ src/
 - [x] Água na aba Nutrição (existia no HTML original, não migrou) — log `water_log` + UI
 - [x] Alimento manual "na mão" (kcal/macros diretos — complementa TACO) — aba no modal
 
-**Chat 4 — Tema & Sessão**
+**Chat 4 — Físico (funcionalidades)**
+- [ ] Melhorar visualização da aba Físico (precisa exemplos concretos)
+- [ ] Editar/adicionar campos e melhorar o módulo Físico como um todo (quebrar em sub-itens no início do chat)
+
+**Chat 5 — Tema & Sessão**
 - [ ] Seletor de tema: aplicar `data-theme` no server a partir de `profile.tema` (evita flash)
 - [ ] Sessão única (`active_sessions`) — race condition não resolvida
 
-**Chat 5 — Dieta (guia estático)**
+**Chat 6 — Dieta (guia estático)**
 - [ ] Bulking/manutenção no guia (só cutting existe; gerador já cobre as 3)
 - [ ] `actionToggleHiddenCard`/`actionShowAllHidden` — dead code ou feature esquecida?
 
