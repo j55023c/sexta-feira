@@ -18,12 +18,11 @@ export async function actionAplicarMetas(metas: Partial<Profile> & { fase?: 'bul
   const { fase, ...profileMetas } = metas
   const today = new Date().toISOString().split('T')[0]
 
-  // 1) Atualiza profile com metas de nutrição
+  // 1) Atualiza/cria profile com metas de nutrição (upsert para criar se não existe)
   if (Object.keys(profileMetas).length > 0) {
     const { error } = await sb
       .from('profiles')
-      .update({ ...profileMetas, updated_at: new Date().toISOString() })
-      .eq('user_id', user.id)
+      .upsert({ user_id: user.id, ...profileMetas, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
     if (error) return { error: error.message }
   }
 
@@ -79,8 +78,7 @@ export async function actionSalvarMetasManuais(metas: {
 
   const { error } = await sb
     .from('profiles')
-    .update({ ...metas, updated_at: new Date().toISOString() })
-    .eq('user_id', user.id)
+    .upsert({ user_id: user.id, ...metas, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
 
   if (error) return { error: error.message }
 
