@@ -161,6 +161,7 @@ export default function CalculadoraClient({ profile, fisicoLog }: Props) {
       const result = await actionAplicarMetas({
         kcal_meta: resultado.kcal, prot_meta: resultado.prot,
         carbo_meta: resultado.carb, gord_meta: resultado.fat,
+        fase: resultado.fase,
         ...(resultado.metaPeso ? { meta_peso: resultado.metaPeso } : {}),
       })
       if (!result?.error) setShowSugestao(true)

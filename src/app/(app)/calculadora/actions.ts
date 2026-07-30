@@ -10,17 +10,52 @@ async function getUser() {
   return { sb, user }
 }
 
-// Aplica metas calculadas no perfil (Nutrição)
-export async function actionAplicarMetas(metas: Partial<Profile>) {
+// Aplica metas calculadas no perfil (Nutrição) E atualiza protocolo (fase + data_inicio)
+export async function actionAplicarMetas(metas: Partial<Profile> & { fase?: 'bulking' | 'cutting' | 'manutencao' }) {
   const { sb, user } = await getUser()
   if (!user) return { error: 'Não autenticado' }
 
-  const { error } = await sb
-    .from('profiles')
-    .update({ ...metas, updated_at: new Date().toISOString() })
-    .eq('user_id', user.id)
+  const { fase, ...profileMetas } = metas
+  const today = new Date().toISOString().split('T')[0]
 
-  if (error) return { error: error.message }
+  // 1) Atualiza profile com metas de nutrição
+  if (Object.keys(profileMetas).length > 0) {
+    const { error } = await sb
+      .from('profiles')
+      .update({ ...profileMetas, updated_at: new Date().toISOString() })
+      .eq('user_id', user.id)
+    if (error) return { error: error.message }
+  }
+
+  // 2) Se veio fase, atualiza protocolo (arquiva fase antiga se mudou)
+  if (fase) {
+    const { data: protocoloAtual } = await sb
+      .from('protocolo')
+      .select('fase, nome, data_inicio, kcal_meta, prot_meta')
+      .eq('user_id', user.id)
+      .single()
+
+    const faseMudou = protocoloAtual && protocoloAtual.fase !== fase
+
+    if (faseMudou && protocoloAtual) {
+      await sb.from('historico_fases').insert({
+        user_id: user.id,
+        fase: protocoloAtual.fase,
+        nome: protocoloAtual.nome,
+        data_inicio: protocoloAtual.data_inicio,
+        data_fim: today,
+        kcal_meta: protocoloAtual.kcal_meta,
+        prot_meta: protocoloAtual.prot_meta,
+      })
+    }
+
+    const { error } = await sb.from('protocolo').update({
+      fase,
+      data_inicio: faseMudou ? today : protocoloAtual?.data_inicio || today,
+      updated_at: new Date().toISOString(),
+    }).eq('user_id', user.id)
+    if (error) return { error: error.message }
+  }
 
   revalidatePath('/calculadora')
   revalidatePath('/nutricao')
