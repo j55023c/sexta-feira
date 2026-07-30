@@ -28,6 +28,7 @@ export async function actionAplicarMetas(metas: Partial<Profile> & { fase?: 'bul
   }
 
   // 2) Se veio fase, atualiza protocolo (arquiva fase antiga se mudou)
+  // Usa upsert para criar protocolo se não existir
   if (fase) {
     const { data: protocoloAtual } = await sb
       .from('protocolo')
@@ -49,11 +50,14 @@ export async function actionAplicarMetas(metas: Partial<Profile> & { fase?: 'bul
       })
     }
 
-    const { error } = await sb.from('protocolo').update({
+    // upsert protocolo - cria se não existe, atualiza se existe
+    const { error } = await sb.from('protocolo').upsert({
+      user_id: user.id,
       fase,
       data_inicio: faseMudou ? today : protocoloAtual?.data_inicio || today,
+      nome: protocoloAtual?.nome || `Protocolo ${fase}`,
       updated_at: new Date().toISOString(),
-    }).eq('user_id', user.id)
+    }, { onConflict: 'user_id' })
     if (error) return { error: error.message }
   }
 
