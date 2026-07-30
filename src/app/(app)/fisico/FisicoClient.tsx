@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { Plus, Trash2, Pencil, Check } from 'lucide-react'
+import MobileSheet from '@/components/ui/MobileSheet'
 import type { FisicoLog, Profile, CustomCheck } from '@/lib/types'
 import { actionSaveFisico, actionSaveCustomChecks } from './actions'
 
@@ -153,13 +154,28 @@ export default function FisicoClient({ fisicoLog: initialLog, profile }: Props) 
   const [editingCheck, setEditingCheck] = useState<CustomCheck | null>(null)
   const [checkForm, setCheckForm] = useState<Partial<CustomCheck>>({})
 
-  const existing = fisicoLog[selectedDate]
-  const [form, setForm] = useState<Omit<FisicoLog, 'user_id'>>(existing ?? emptyLog(selectedDate))
+  // Form por data — sempre derivado do fisicoLog[selectedDate]
+  const [form, setForm] = useState<Omit<FisicoLog, 'user_id'>>(() => {
+    const existing = initialLog[selectedDate]
+    return existing ?? emptyLog(selectedDate)
+  })
+
+  // Sincroniza form quando selectedDate ou fisicoLog mudam
+  useEffect(() => {
+    const existing = fisicoLog[selectedDate]
+    setForm(existing ?? emptyLog(selectedDate))
+    setSaved(false)
+  }, [selectedDate, fisicoLog])
+
+  function changeDate(days: number) {
+    const d = new Date(selectedDate)
+    d.setDate(d.getDate() + days)
+    if (d > new Date()) return // não permite futuro
+    setSelectedDate(d.toISOString().split('T')[0])
+  }
 
   function handleDateChange(date: string) {
     setSelectedDate(date)
-    setSaved(false)
-    setForm(fisicoLog[date] ?? emptyLog(date))
   }
 
   function update<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
@@ -227,40 +243,45 @@ export default function FisicoClient({ fisicoLog: initialLog, profile }: Props) 
   const pesoAtual = form.peso
   const diffPeso = pesoAtual && pesoPrev ? (pesoAtual - pesoPrev) : null
 
+  const isToday = selectedDate === TODAY
+  const completedCount = customChecks.filter(c => (form.checks ?? []).includes(c.label)).length
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div>
-      <h1 style={{ fontSize: 21, fontWeight: 800, marginBottom: 3, color: 'var(--text)' }}>Físico</h1>
-      <p style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 20 }}>
-        Registre seu progresso diário — peso, sono, treino e sensações.
-      </p>
-
-      {/* Seletor de data */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-        <input
-          type="date"
-          value={selectedDate}
-          max={TODAY}
-          onChange={e => handleDateChange(e.target.value)}
-          style={{ ...inputStyle, maxWidth: 180 }}
-        />
-        {selectedDate !== TODAY && (
-          <button onClick={() => handleDateChange(TODAY)} style={{ ...btnS, ...btnSm }}>
-            Hoje
-          </button>
-        )}
-        <span style={{ fontSize: 12, color: 'var(--muted)', fontFamily: 'var(--font-dm-mono)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <div>
+          <h1 style={{ fontSize: 21, fontWeight: 800, color: 'var(--text)' }}>Físico</h1>
+          <p style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 4 }}>
+            Registre seu progresso diário — peso, sono, treino e sensações.
+          </p>
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--muted)', fontFamily: 'var(--font-dm-mono)', textAlign: 'right' }}>
           {fisicoLog[selectedDate] ? '✓ Registrado' : '— Sem registro'}
+        </div>
+      </div>
+
+      {/* Date navigator */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '12px 16px', marginBottom: 20 }}>
+        <button onClick={() => changeDate(-1)} style={{ padding: '6px 10px', borderRadius: 'var(--radius)', background: 'none', border: '1px solid var(--border2)', color: 'var(--muted)', cursor: 'pointer', fontSize: 14 }}>
+          ‹
+        </button>
+        <span style={{ fontWeight: 600, fontSize: 14, minWidth: 220, textAlign: 'center', color: 'var(--text)' }}>
+          {isToday ? 'Hoje' : new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
         </span>
+        <button onClick={() => changeDate(1)} disabled={isToday} style={{ padding: '6px 10px', borderRadius: 'var(--radius)', background: 'none', border: '1px solid var(--border2)', color: isToday ? 'var(--hint)' : 'var(--muted)', cursor: isToday ? 'not-allowed' : 'pointer', fontSize: 14, opacity: isToday ? 0.4 : 1 }}>
+          ›
+        </button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
 
         {/* Coluna esquerda */}
-        <div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
           {/* Corpo */}
-          <div style={{ ...card, marginBottom: 14 }}>
+          <div style={card}>
             <Divider label="Corpo" />
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -276,7 +297,7 @@ export default function FisicoClient({ fisicoLog: initialLog, profile }: Props) 
                   {diffPeso !== null && (
                     <div style={{
                       fontSize: 11, marginTop: 4, fontFamily: 'var(--font-dm-mono)',
-                      color: diffPeso > 0 ? 'var(--green)' : diffPeso < 0 ? 'var(--accent)' : 'var(--muted)',
+                      color: diffPeso > 0 ? 'var(--accent)' : diffPeso < 0 ? 'var(--green)' : 'var(--muted)',
                     }}>
                       {diffPeso > 0 ? '+' : ''}{diffPeso.toFixed(1)}kg vs {fmtDate(datePrev!)}
                     </div>
@@ -321,7 +342,7 @@ export default function FisicoClient({ fisicoLog: initialLog, profile }: Props) 
           </div>
 
           {/* Sono */}
-          <div style={{ ...card, marginBottom: 14 }}>
+          <div style={card}>
             <Divider label="Sono" />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <Field label="Dormiu às">
@@ -376,9 +397,10 @@ export default function FisicoClient({ fisicoLog: initialLog, profile }: Props) 
         </div>
 
         {/* Coluna direita */}
-        <div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
           {/* Músculos treinados */}
-          <div style={{ ...card, marginBottom: 14 }}>
+          <div style={card}>
             <Divider label="Músculos treinados" />
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {MUSCULOS_OPTS.map(m => (
@@ -393,7 +415,7 @@ export default function FisicoClient({ fisicoLog: initialLog, profile }: Props) 
           </div>
 
           {/* Sensações */}
-          <div style={{ ...card, marginBottom: 14 }}>
+          <div style={card}>
             <Divider label="Sensações" />
 
             <Field label="Como você se sentiu hoje">
@@ -414,18 +436,29 @@ export default function FisicoClient({ fisicoLog: initialLog, profile }: Props) 
           </div>
 
           {/* Checklist diário (customizável) */}
-          <div style={{ ...card, marginBottom: 14 }}>
+          <div style={card}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
               <Divider label="Checklist do dia" />
               <button
                 onClick={() => { setEditingCheck(null); setCheckForm({}); setShowCheckForm(true); }}
-                style={{ fontSize: 11, color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer' }}
+                style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
               >
-                + Adicionar
+                <Plus style={{ width: 14, height: 14 }} /> Adicionar
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {/* Progress bar */}
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>
+                <span>Progresso</span>
+                <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{completedCount}/{customChecks.length}</span>
+              </div>
+              <div style={{ height: 6, background: 'var(--surface2)', borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ height: '100%', background: 'var(--accent)', borderRadius: 3, width: `${customChecks.length > 0 ? Math.round((completedCount / customChecks.length) * 100) : 0}%`, transition: 'width .3s ease' }} />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {customChecks.map((check, i) => {
                 const active = (form.checks ?? []).includes(check.label)
                 return (
@@ -435,39 +468,41 @@ export default function FisicoClient({ fisicoLog: initialLog, profile }: Props) 
                     style={{
                       display: 'flex', alignItems: 'center', gap: 10,
                       cursor: 'pointer', fontSize: 13, userSelect: 'none',
-                      padding: '8px 10px', borderRadius: 'var(--radius)',
-                      background: active ? 'var(--accent-glow-10)' : 'transparent',
-                      border: active ? '1px solid var(--accent)' : '1px solid transparent',
+                      padding: '10px 12px', borderRadius: 'var(--radius)',
+                      background: active ? 'var(--accent-glow-10)' : 'var(--surface)',
+                      border: active ? '1px solid var(--accent)' : '1px solid var(--border)',
                       transition: 'all .13s',
                       color: active ? 'var(--text)' : 'var(--muted)',
                     }}
+                    onMouseEnter={e => { e.currentTarget.style.background = active ? 'var(--accent-glow-10)' : 'var(--surface2)' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = active ? 'var(--accent-glow-10)' : 'var(--surface)' }}
                   >
                     <div style={{
-                      width: 24, height: 24, borderRadius: 6, flexShrink: 0,
+                      width: 28, height: 28, borderRadius: 8, flexShrink: 0,
                       border: active ? 'none' : '2px solid var(--border2)',
-                      background: active ? 'var(--accent)' : 'transparent',
+                      background: active ? 'var(--accent)' : 'var(--surface2)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: 14,
                     }}>
-                      {active ? <Check style={{ width: 14, height: 14, color: 'white' }} /> : <span>{check.emoji}</span>}
+                      {active ? <Check style={{ width: 16, height: 16, color: 'white' }} /> : <span>{check.emoji}</span>}
                     </div>
 
                     <span style={{ flex: 1, textAlign: 'left' }}>{check.label}</span>
 
-                    <div style={{ display: 'flex', gap: 4, opacity: 0, transition: 'opacity .13s' }}>
+                    <div style={{ display: 'flex', gap: 6, opacity: active ? 1 : 0, transition: 'opacity .13s' }}>
                       {!check.is_default && (
                         <>
                           <button
                             onClick={e => { e.stopPropagation(); setEditingCheck(check); setCheckForm({ label: check.label, emoji: check.emoji }); setShowCheckForm(true); }}
-                            style={{ padding: '4px 8px', borderRadius: 4, background: 'var(--surface2)', border: '1px solid var(--border2)', color: 'var(--muted)', cursor: 'pointer', fontSize: 11 }}
+                            style={{ padding: '6px', borderRadius: 6, background: 'var(--surface2)', border: '1px solid var(--border2)', color: 'var(--muted)', cursor: 'pointer', display: 'flex' }}
                           >
-                            <Pencil style={{ width: 12, height: 12 }} />
+                            <Pencil style={{ width: 14, height: 14 }} />
                           </button>
                           <button
                             onClick={e => { e.stopPropagation(); handleDeleteCheck(check.id); }}
-                            style={{ padding: '4px 8px', borderRadius: 4, background: 'var(--surface2)', border: '1px solid var(--border2)', color: 'var(--red)', cursor: 'pointer', fontSize: 11 }}
+                            style={{ padding: '6px', borderRadius: 6, background: 'var(--surface2)', border: '1px solid var(--border2)', color: 'var(--red)', cursor: 'pointer', display: 'flex' }}
                           >
-                            <Trash2 style={{ width: 12, height: 12 }} />
+                            <Trash2 style={{ width: 14, height: 14 }} />
                           </button>
                         </>
                       )}
@@ -476,15 +511,12 @@ export default function FisicoClient({ fisicoLog: initialLog, profile }: Props) 
                 )
               })}
             </div>
-            <div style={{ marginTop: 10, fontSize: 11, color: 'var(--muted)', textAlign: 'right' }}>
-              {(form.checks ?? []).length}/{customChecks.length} completos
-            </div>
           </div>
         </div>
       </div>
 
       {/* Botão salvar */}
-      <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
         <button onClick={handleSave} disabled={isPending} style={btnP}>
           {isPending ? 'Salvando...' : 'Salvar registro'}
         </button>
@@ -495,50 +527,53 @@ export default function FisicoClient({ fisicoLog: initialLog, profile }: Props) 
         )}
       </div>
 
-      {/* Modal Add/Edit Check */}
-      {showCheckForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowCheckForm(false)}>
-          <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-sm shadow-xl" onClick={e => e.stopPropagation()}>
-            <h2 className="text-lg font-bold text-foreground mb-4">{editingCheck ? 'Editar' : 'Novo'} Check</h2>
-            <form onSubmit={handleSaveCheck} className="space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-[1px] text-muted-foreground mb-1.5">Emoji</label>
-                <div className="flex gap-1.5 flex-wrap mb-2">
-                  {EMOJI_QUICK.map(emo => (
-                    <button
-                      key={emo} type="button"
-                      onClick={() => setCheckForm(prev => ({ ...prev, emoji: emo }))}
-                      className={`w-8 h-8 rounded-lg text-sm flex items-center justify-center transition-all ${
-                        checkForm.emoji === emo ? 'bg-accent/20 ring-1 ring-accent' : 'bg-surface2 hover:bg-surface'
-                      }`}
-                    >
-                      {emo}
-                    </button>
-                  ))}
-                </div>
-                <input
-                  type="text" value={checkForm.emoji || ''} onChange={e => setCheckForm(prev => ({ ...prev, emoji: e.target.value }))}
-                  placeholder="ou digite" maxLength={4}
-                  className="w-full px-3 py-1.5 border border-border2 rounded-lg bg-surface2 text-xs text-foreground outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-[1px] text-muted-foreground mb-1.5">Descrição</label>
-                <input
-                  type="text" value={checkForm.label || ''} onChange={e => setCheckForm(prev => ({ ...prev, label: e.target.value }))}
-                  placeholder="Ex: Beber 3L de água" required
-                  className="w-full px-3 py-2 border border-border2 rounded-lg bg-surface text-foreground text-sm outline-none focus:border-accent/40"
-                  autoFocus
-                />
-              </div>
-              <div className="flex gap-3 justify-end pt-2">
-                <button type="button" onClick={() => setShowCheckForm(false)} className="px-4 py-2 rounded-lg border border-border2 text-sm text-muted-foreground hover:bg-surface transition-colors">Cancelar</button>
-                <button type="submit" className="px-4 py-2 rounded-lg bg-accent text-accent-foreground text-sm font-semibold hover:opacity-90 transition-opacity">{editingCheck ? 'Atualizar' : 'Adicionar'}</button>
-              </div>
-            </form>
+      {/* Modal Add/Edit Check usando MobileSheet */}
+      <MobileSheet
+        isOpen={showCheckForm}
+        onClose={() => { setShowCheckForm(false); setEditingCheck(null); setCheckForm({}) }}
+        title={editingCheck ? 'Editar Check' : 'Novo Check'}
+        wide={false}
+      >
+        <form onSubmit={handleSaveCheck} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <label style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>Emoji</label>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+              {EMOJI_QUICK.map(emo => (
+                <button
+                  key={emo} type="button"
+                  onClick={() => setCheckForm(prev => ({ ...prev, emoji: emo }))}
+                  style={{
+                    width: 40, height: 40, borderRadius: 10, fontSize: 16,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: checkForm.emoji === emo ? 'var(--accent-glow-20)' : 'var(--surface2)',
+                    border: checkForm.emoji === emo ? '1px solid var(--accent)' : '1px solid var(--border2)',
+                    color: 'var(--text)', cursor: 'pointer', transition: 'all .13s',
+                  }}
+                >
+                  {emo}
+                </button>
+              ))}
+            </div>
+            <input
+              type="text" value={checkForm.emoji || ''} onChange={e => setCheckForm(prev => ({ ...prev, emoji: e.target.value }))}
+              placeholder="ou digite" maxLength={4}
+              style={{ ...inputStyle, fontSize: 12, padding: '8px 10px' }}
+            />
           </div>
-        </div>
-      )}
+          <div>
+            <label style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>Descrição</label>
+            <input
+              type="text" value={checkForm.label || ''} onChange={e => setCheckForm(prev => ({ ...prev, label: e.target.value }))}
+              placeholder="Ex: Beber 3L de água" required autoFocus
+              style={inputStyle}
+            />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+            <button type="button" onClick={() => { setShowCheckForm(false); setEditingCheck(null); setCheckForm({}) }} style={btnS}>Cancelar</button>
+            <button type="submit" style={btnP}>{editingCheck ? 'Atualizar' : 'Adicionar'}</button>
+          </div>
+        </form>
+      </MobileSheet>
     </div>
   )
 }
