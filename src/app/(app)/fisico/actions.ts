@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import type { FisicoLog } from '@/lib/types'
+import type { FisicoLog, CustomCheck } from '@/lib/types'
 
 async function getUser() {
   const sb = await createClient()
@@ -22,4 +22,18 @@ export async function actionSaveFisico(log: Omit<FisicoLog, 'user_id'>) {
 
   revalidatePath('/fisico')
   revalidatePath('/home')
+}
+
+export async function actionSaveCustomChecks(checks: CustomCheck[]) {
+  const { sb, user } = await getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const { error } = await sb.from('profiles').upsert(
+    { user_id: user.id, custom_checks: checks, updated_at: new Date().toISOString() },
+    { onConflict: 'user_id' }
+  )
+  if (error) return { error: error.message }
+
+  revalidatePath('/fisico')
+  return { success: true }
 }

@@ -3,6 +3,13 @@
 // Se mudar o banco, muda aqui — e o TypeScript avisa em todos os lugares afetados.
 
 // ── Perfil ──
+export interface CustomCheck {
+  id: string
+  label: string
+  emoji: string
+  is_default?: boolean
+}
+
 export interface Profile {
   user_id: string
   nome: string
@@ -17,6 +24,7 @@ export interface Profile {
   streak_count: number
   streak_last_date: string
   hidden_cards: Record<string, string[]>
+  custom_checks: CustomCheck[]
   updated_at?: string
 }
 
@@ -208,6 +216,7 @@ export const defaultProfile: Omit<Profile, 'user_id'> = {
   streak_count: 0,
   streak_last_date: '',
   hidden_cards: {},
+  custom_checks: [],
 }
 
 export const defaultProtocolo: Omit<Protocolo, 'user_id'> = {
