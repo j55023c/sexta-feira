@@ -134,6 +134,30 @@ export async function actionAceitarCardapioSugerido(sugestao: Omit<Cardapio, 'us
   const { sb, user } = await getUser()
   if (!user) return { error: 'Não autenticado' }
 
+  // Busca protocolo atual para saber fase antiga e dados para histórico
+  const { data: protocoloAtual } = await sb
+    .from('protocolo')
+    .select('fase, nome, data_inicio, kcal_meta, prot_meta')
+    .eq('user_id', user.id)
+    .single()
+
+  const today = new Date().toISOString().split('T')[0]
+  const novaFase = sugestao.objetivo
+  const faseMudou = protocoloAtual && protocoloAtual.fase !== novaFase
+
+  // Se fase mudou, arquiva a fase atual no histórico
+  if (faseMudou && protocoloAtual) {
+    await sb.from('historico_fases').insert({
+      user_id: user.id,
+      fase: protocoloAtual.fase,
+      nome: protocoloAtual.nome,
+      data_inicio: protocoloAtual.data_inicio,
+      data_fim: today,
+      kcal_meta: protocoloAtual.kcal_meta,
+      prot_meta: protocoloAtual.prot_meta,
+    })
+  }
+
   const novoCardapio: Omit<Cardapio, 'user_id'> = {
     id: `${sugestao.id}-${Date.now()}`,
     nome: sugestao.nome,
@@ -148,9 +172,14 @@ export async function actionAceitarCardapioSugerido(sugestao: Omit<Cardapio, 'us
   )
   if (errCardapio) return { error: errCardapio.message }
 
-  const { error: errProtocolo } = await sb.from('protocolo')
-    .update({ cardapio_ativo_id: novoCardapio.id, updated_at: new Date().toISOString() })
-    .eq('user_id', user.id)
+  // Atualiza protocolo: fase, data_inicio (se mudou), cardapio_ativo_id
+  const { error: errProtocolo } = await sb.from('protocolo').update({
+    fase: novaFase,
+    nome: protocoloAtual?.nome || novoCardapio.nome,
+    cardapio_ativo_id: novoCardapio.id,
+    data_inicio: faseMudou ? today : protocoloAtual?.data_inicio || today,
+    updated_at: new Date().toISOString(),
+  }).eq('user_id', user.id)
   if (errProtocolo) return { error: errProtocolo.message }
 
   revalidatePath('/dieta')
