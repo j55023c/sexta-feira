@@ -439,89 +439,93 @@ export default function FisicoClient({ fisicoLog: initialLog, profile }: Props) 
           </div>
 
           {/* Checklist diário (customizável) — grid 2 colunas igual ao Corpo */}
-                    <div style={card}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                        <Divider label="CHECKLIST DO DIA" />
-                        <button
-                          onClick={() => { setEditingCheck(null); setCheckForm({}); setShowCheckForm(true); }}
-                          style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                        >
-                          <Plus style={{ width: 14, height: 14 }} /> Adicionar
-                        </button>
-                      </div>
+          <div style={card}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <div style={{ flex: 1, height: 1, background: 'var(--border2)' }} />
+              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.8, textTransform: 'uppercase', color: 'var(--hint)' }}>Checklist do dia</span>
+              <button
+                onClick={() => { setEditingCheck(null); setCheckForm({}); setShowCheckForm(true); }}
+                style={{ padding: '4px 8px', fontSize: 11, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}
+              >
+                <Plus style={{ width: 14, height: 14 }} /> Adicionar
+              </button>
+              <div style={{ flex: 1, height: 1, background: 'var(--border2)' }} />
+            </div>
 
-                      {/* Progress bar */}
-                      <div style={{ marginBottom: 12 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>
-                          <span>Progresso</span>
-                          <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{completedCount}/{customChecks.length}</span>
-                        </div>
-                        <div style={{ height: 6, background: 'var(--surface2)', borderRadius: 3, overflow: 'hidden' }}>
-                          <div style={{ height: '100%', background: 'var(--accent)', borderRadius: 3, width: `${customChecks.length > 0 ? Math.round((completedCount / customChecks.length) * 100) : 0}%`, transition: 'width .3s ease' }} />
-                        </div>
-                      </div>
+            {/* Progress bar */}
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>
+                <span>Progresso</span>
+                <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{completedCount}/{customChecks.length}</span>
+              </div>
+              <div style={{ height: 6, background: 'var(--surface2)', borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ height: '100%', background: 'var(--accent)', borderRadius: 3, width: `${customChecks.length > 0 ? Math.round((completedCount / customChecks.length) * 100) : 0}%`, transition: 'width .3s ease' }} />
+              </div>
+            </div>
 
-                      {/* Grid 2 colunas para os checks */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                        {customChecks.map((check, i) => {
-                          const active = (form.checks ?? []).includes(check.label)
-                          return (
-                            <label
-                                                          key={check.id}
-                                                          onClick={() => toggleCheck(check.label)}
-                                                          style={{
-                                                            display: 'flex', alignItems: 'center', gap: 8,
-                                                            cursor: 'pointer', fontSize: 12.5, userSelect: 'none',
-                                                            padding: '8px 10px', borderRadius: 'var(--radius)',
-                                                            background: active ? 'var(--accent-glow-10)' : 'var(--surface)',
-                                                            border: active ? '1px solid var(--accent)' : '1px solid var(--border)',
-                                                            transition: 'all .13s',
-                                                            color: active ? 'var(--text)' : 'var(--muted)',
-                                                          }}
-                                                          onMouseEnter={e => { 
-                                                                                                                      e.currentTarget.style.background = active ? 'var(--accent-glow-10)' : 'var(--surface2)'
-                                                                                                                      // Mostra botões de ação no hover
-                                                                                                                      const actions = e.currentTarget.querySelector('.check-actions') as HTMLElement | null
-                                                                                                                      if (actions) actions.style.opacity = '1'
-                                                                                                                    }}
-                                                                                                                    onMouseLeave={e => { 
-                                                                                                                      e.currentTarget.style.background = active ? 'var(--accent-glow-10)' : 'var(--surface)'
-                                                                                                                      // Esconde botões de ação
-                                                                                                                      const actions = e.currentTarget.querySelector('.check-actions') as HTMLElement | null
-                                                                                                                      if (actions) actions.style.opacity = '0'
-                                                                                                                    }}
-                                                        >
-                              <div style={{
-                                width: 24, height: 24, borderRadius: 6, flexShrink: 0,
-                                border: active ? 'none' : '2px solid var(--border2)',
-                                background: active ? 'var(--accent)' : 'var(--surface2)',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                fontSize: 13,
-                              }}>
-                                {active ? <Check style={{ width: 14, height: 14, color: 'white' }} /> : <span>{check.emoji}</span>}
-                              </div>
+            {/* Grid 2 colunas para os checks */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {customChecks.map((check) => {
+                const active = (form.checks ?? []).includes(check.label)
+                return (
+                  <div
+                    key={check.id}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      padding: '8px 10px', borderRadius: 'var(--radius)',
+                      background: active ? 'var(--accent-glow-10)' : 'var(--surface)',
+                      border: active ? '1px solid var(--accent)' : '1px solid var(--border)',
+                      transition: 'all .13s',
+                      color: active ? 'var(--text)' : 'var(--muted)',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = active ? 'var(--accent-glow-10)' : 'var(--surface2)'
+                      const actions = e.currentTarget.querySelector('.check-actions') as HTMLElement | null
+                      if (actions) actions.style.opacity = '1'
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = active ? 'var(--accent-glow-10)' : 'var(--surface)'
+                      const actions = e.currentTarget.querySelector('.check-actions') as HTMLElement | null
+                      if (actions) actions.style.opacity = '0'
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => toggleCheck(check.label)}
+                      style={{
+                        width: 24, height: 24, borderRadius: 6, flexShrink: 0,
+                        border: active ? 'none' : '2px solid var(--border2)',
+                        background: active ? 'var(--accent)' : 'var(--surface2)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 13, cursor: 'pointer', padding: 0,
+                      }}
+                    >
+                      {active ? <Check style={{ width: 14, height: 14, color: 'white' }} /> : <span>{check.emoji}</span>}
+                    </button>
 
-                              <div className="check-actions" style={{ display: 'flex', gap: 4, opacity: 0, transition: 'opacity .13s' }}>
-                                                              <button
-                                                                onClick={e => { e.stopPropagation(); setEditingCheck(check); setCheckForm({ label: check.label, emoji: check.emoji }); setShowCheckForm(true); }}
-                                                                style={{ padding: '4px', borderRadius: 4, background: 'var(--surface2)', border: '1px solid var(--border2)', color: 'var(--muted)', cursor: 'pointer', display: 'flex' }}
-                                                                title="Editar"
-                                                              >
-                                                                <Pencil style={{ width: 12, height: 12 }} />
-                                                              </button>
-                                                              <button
-                                                                onClick={e => { e.stopPropagation(); handleDeleteCheck(check.id); }}
-                                                                style={{ padding: '4px', borderRadius: 4, background: 'var(--surface2)', border: '1px solid var(--border2)', color: 'var(--red)', cursor: 'pointer', display: 'flex' }}
-                                                                title="Excluir"
-                                                              >
-                                                                <Trash2 style={{ width: 11, height: 11 }} />
-                                                              </button>
-                                                            </div>
-                                                          </label>
-                          )
-                        })}
-                      </div>
+                    <span style={{ flex: 1, fontSize: 12.5, userSelect: 'none' }}>{check.label}</span>
+
+                    <div className="check-actions" style={{ display: 'flex', gap: 4, opacity: 0, transition: 'opacity .13s', flexShrink: 0 }}>
+                      <button
+                        onClick={e => { e.stopPropagation(); setEditingCheck(check); setCheckForm({ label: check.label, emoji: check.emoji }); setShowCheckForm(true); }}
+                        style={{ padding: '4px', borderRadius: 4, background: 'var(--surface2)', border: '1px solid var(--border2)', color: 'var(--muted)', cursor: 'pointer', display: 'flex' }}
+                        title="Editar"
+                      >
+                        <Pencil style={{ width: 12, height: 12 }} />
+                      </button>
+                      <button
+                        onClick={e => { e.stopPropagation(); handleDeleteCheck(check.id); }}
+                        style={{ padding: '4px', borderRadius: 4, background: 'var(--surface2)', border: '1px solid var(--border2)', color: 'var(--red)', cursor: 'pointer', display: 'flex' }}
+                        title="Excluir"
+                      >
+                        <Trash2 style={{ width: 11, height: 11 }} />
+                      </button>
                     </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         </div>
       </div>
 
