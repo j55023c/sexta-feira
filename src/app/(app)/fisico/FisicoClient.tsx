@@ -438,83 +438,78 @@ export default function FisicoClient({ fisicoLog: initialLog, profile }: Props) 
             </Field>
           </div>
 
-          {/* Checklist diário (customizável) */}
-          <div style={card}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <Divider label="Checklist do dia" />
-              <button
-                onClick={() => { setEditingCheck(null); setCheckForm({}); setShowCheckForm(true); }}
-                style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-              >
-                <Plus style={{ width: 14, height: 14 }} /> Adicionar
-              </button>
-            </div>
+          {/* Checklist diário (customizável) — grid 2 colunas igual ao Corpo */}
+                    <div style={card}>
+                      <Divider label="CHECKLIST DO DIA" />
+            
+                      {/* Progress bar */}
+                      <div style={{ marginBottom: 12 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>
+                          <span>Progresso</span>
+                          <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{completedCount}/{customChecks.length}</span>
+                        </div>
+                        <div style={{ height: 6, background: 'var(--surface2)', borderRadius: 3, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', background: 'var(--accent)', borderRadius: 3, width: `${customChecks.length > 0 ? Math.round((completedCount / customChecks.length) * 100) : 0}%`, transition: 'width .3s ease' }} />
+                        </div>
+                      </div>
 
-            {/* Progress bar */}
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>
-                <span>Progresso</span>
-                <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{completedCount}/{customChecks.length}</span>
-              </div>
-              <div style={{ height: 6, background: 'var(--surface2)', borderRadius: 3, overflow: 'hidden' }}>
-                <div style={{ height: '100%', background: 'var(--accent)', borderRadius: 3, width: `${customChecks.length > 0 ? Math.round((completedCount / customChecks.length) * 100) : 0}%`, transition: 'width .3s ease' }} />
-              </div>
-            </div>
+                      {/* Grid 2 colunas para os checks */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        {customChecks.map((check, i) => {
+                          const active = (form.checks ?? []).includes(check.label)
+                          return (
+                            <label
+                              key={check.id}
+                              onClick={() => toggleCheck(check.label)}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 8,
+                                cursor: 'pointer', fontSize: 12.5, userSelect: 'none',
+                                padding: '8px 10px', borderRadius: 'var(--radius)',
+                                background: active ? 'var(--accent-glow-10)' : 'var(--surface)',
+                                border: active ? '1px solid var(--accent)' : '1px solid var(--border)',
+                                transition: 'all .13s',
+                                color: active ? 'var(--text)' : 'var(--muted)',
+                              }}
+                              onMouseEnter={e => { e.currentTarget.style.background = active ? 'var(--accent-glow-10)' : 'var(--surface2)' }}
+                              onMouseLeave={e => { e.currentTarget.style.background = active ? 'var(--accent-glow-10)' : 'var(--surface)' }}
+                            >
+                              <div style={{
+                                width: 24, height: 24, borderRadius: 6, flexShrink: 0,
+                                border: active ? 'none' : '2px solid var(--border2)',
+                                background: active ? 'var(--accent)' : 'var(--surface2)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: 13,
+                              }}>
+                                {active ? <Check style={{ width: 14, height: 14, color: 'white' }} /> : <span>{check.emoji}</span>}
+                              </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {customChecks.map((check, i) => {
-                const active = (form.checks ?? []).includes(check.label)
-                return (
-                  <label
-                    key={check.id}
-                    onClick={() => toggleCheck(check.label)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 10,
-                      cursor: 'pointer', fontSize: 13, userSelect: 'none',
-                      padding: '10px 12px', borderRadius: 'var(--radius)',
-                      background: active ? 'var(--accent-glow-10)' : 'var(--surface)',
-                      border: active ? '1px solid var(--accent)' : '1px solid var(--border)',
-                      transition: 'all .13s',
-                      color: active ? 'var(--text)' : 'var(--muted)',
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.background = active ? 'var(--accent-glow-10)' : 'var(--surface2)' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = active ? 'var(--accent-glow-10)' : 'var(--surface)' }}
-                  >
-                    <div style={{
-                      width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-                      border: active ? 'none' : '2px solid var(--border2)',
-                      background: active ? 'var(--accent)' : 'var(--surface2)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 14,
-                    }}>
-                      {active ? <Check style={{ width: 16, height: 16, color: 'white' }} /> : <span>{check.emoji}</span>}
+                              <span style={{ flex: 1, textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{check.label}</span>
+
+                              <div style={{ display: 'flex', gap: 4, opacity: active ? 1 : 0, transition: 'opacity .13s' }}>
+                                {!check.is_default && (
+                                  <>
+                                    <button
+                                      onClick={e => { e.stopPropagation(); setEditingCheck(check); setCheckForm({ label: check.label, emoji: check.emoji }); setShowCheckForm(true); }}
+                                      style={{ padding: '4px', borderRadius: 4, background: 'var(--surface2)', border: '1px solid var(--border2)', color: 'var(--muted)', cursor: 'pointer', display: 'flex' }}
+                                      title="Editar"
+                                    >
+                                      <Pencil style={{ width: 12, height: 12 }} />
+                                    </button>
+                                    <button
+                                      onClick={e => { e.stopPropagation(); handleDeleteCheck(check.id); }}
+                                      style={{ padding: '4px', borderRadius: 4, background: 'var(--surface2)', border: '1px solid var(--border2)', color: 'var(--red)', cursor: 'pointer', display: 'flex' }}
+                                      title="Excluir"
+                                    >
+                                      <Trash2 style={{ width: 11, height: 11 }} />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </label>
+                          )
+                        })}
+                      </div>
                     </div>
-
-                    <span style={{ flex: 1, textAlign: 'left' }}>{check.label}</span>
-
-                    <div style={{ display: 'flex', gap: 6, opacity: active ? 1 : 0, transition: 'opacity .13s' }}>
-                      {!check.is_default && (
-                        <>
-                          <button
-                            onClick={e => { e.stopPropagation(); setEditingCheck(check); setCheckForm({ label: check.label, emoji: check.emoji }); setShowCheckForm(true); }}
-                            style={{ padding: '6px', borderRadius: 6, background: 'var(--surface2)', border: '1px solid var(--border2)', color: 'var(--muted)', cursor: 'pointer', display: 'flex' }}
-                          >
-                            <Pencil style={{ width: 14, height: 14 }} />
-                          </button>
-                          <button
-                            onClick={e => { e.stopPropagation(); handleDeleteCheck(check.id); }}
-                            style={{ padding: '6px', borderRadius: 6, background: 'var(--surface2)', border: '1px solid var(--border2)', color: 'var(--red)', cursor: 'pointer', display: 'flex' }}
-                          >
-                            <Trash2 style={{ width: 14, height: 14 }} />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </label>
-                )
-              })}
-            </div>
-          </div>
         </div>
       </div>
 
