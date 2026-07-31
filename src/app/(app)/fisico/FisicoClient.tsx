@@ -501,29 +501,23 @@ export default function FisicoClient({ fisicoLog: initialLog, profile }: Props) 
                                 {active ? <Check style={{ width: 14, height: 14, color: 'white' }} /> : <span>{check.emoji}</span>}
                               </div>
 
-                              <span style={{ flex: 1, textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{check.label}</span>
-
                               <div className="check-actions" style={{ display: 'flex', gap: 4, opacity: 0, transition: 'opacity .13s' }}>
-                                {!check.is_default && (
-                                  <>
-                                    <button
-                                      onClick={e => { e.stopPropagation(); setEditingCheck(check); setCheckForm({ label: check.label, emoji: check.emoji }); setShowCheckForm(true); }}
-                                      style={{ padding: '4px', borderRadius: 4, background: 'var(--surface2)', border: '1px solid var(--border2)', color: 'var(--muted)', cursor: 'pointer', display: 'flex' }}
-                                      title="Editar"
-                                    >
-                                      <Pencil style={{ width: 12, height: 12 }} />
-                                    </button>
-                                    <button
-                                      onClick={e => { e.stopPropagation(); handleDeleteCheck(check.id); }}
-                                      style={{ padding: '4px', borderRadius: 4, background: 'var(--surface2)', border: '1px solid var(--border2)', color: 'var(--red)', cursor: 'pointer', display: 'flex' }}
-                                      title="Excluir"
-                                    >
-                                      <Trash2 style={{ width: 11, height: 11 }} />
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                            </label>
+                                                              <button
+                                                                onClick={e => { e.stopPropagation(); setEditingCheck(check); setCheckForm({ label: check.label, emoji: check.emoji }); setShowCheckForm(true); }}
+                                                                style={{ padding: '4px', borderRadius: 4, background: 'var(--surface2)', border: '1px solid var(--border2)', color: 'var(--muted)', cursor: 'pointer', display: 'flex' }}
+                                                                title="Editar"
+                                                              >
+                                                                <Pencil style={{ width: 12, height: 12 }} />
+                                                              </button>
+                                                              <button
+                                                                onClick={e => { e.stopPropagation(); handleDeleteCheck(check.id); }}
+                                                                style={{ padding: '4px', borderRadius: 4, background: 'var(--surface2)', border: '1px solid var(--border2)', color: 'var(--red)', cursor: 'pointer', display: 'flex' }}
+                                                                title="Excluir"
+                                                              >
+                                                                <Trash2 style={{ width: 11, height: 11 }} />
+                                                              </button>
+                                                            </div>
+                                                          </label>
                           )
                         })}
                       </div>
