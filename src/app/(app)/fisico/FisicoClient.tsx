@@ -263,17 +263,27 @@ export default function FisicoClient({ fisicoLog: initialLog, profile }: Props) 
       </div>
 
       {/* Date navigator */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '12px 16px', marginBottom: 20 }}>
-        <button onClick={() => changeDate(-1)} style={{ padding: '6px 10px', borderRadius: 'var(--radius)', background: 'none', border: '1px solid var(--border2)', color: 'var(--muted)', cursor: 'pointer', fontSize: 14 }}>
-          ‹
-        </button>
-        <span style={{ fontWeight: 600, fontSize: 14, minWidth: 220, textAlign: 'center', color: 'var(--text)' }}>
-          {isToday ? 'Hoje' : new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
-        </span>
-        <button onClick={() => changeDate(1)} disabled={isToday} style={{ padding: '6px 10px', borderRadius: 'var(--radius)', background: 'none', border: '1px solid var(--border2)', color: isToday ? 'var(--hint)' : 'var(--muted)', cursor: isToday ? 'not-allowed' : 'pointer', fontSize: 14, opacity: isToday ? 0.4 : 1 }}>
-          ›
-        </button>
-      </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '12px 16px', marginBottom: 20 }}>
+              <button onClick={() => changeDate(-1)} style={{ padding: '6px 10px', borderRadius: 'var(--radius)', background: 'none', border: '1px solid var(--border2)', color: 'var(--muted)', cursor: 'pointer', fontSize: 14 }}>
+                ‹
+              </button>
+              <span 
+                onClick={() => handleDateChange(TODAY)}
+                style={{ 
+                  fontWeight: 600, fontSize: 14, minWidth: 220, textAlign: 'center', color: 'var(--text)',
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                  textDecorationColor: 'var(--accent)',
+                  textUnderlineOffset: 2,
+                }}
+                title="Clique para ir para hoje"
+              >
+                {isToday ? 'Hoje' : new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+              </span>
+              <button onClick={() => changeDate(1)} disabled={isToday} style={{ padding: '6px 10px', borderRadius: 'var(--radius)', background: 'none', border: '1px solid var(--border2)', color: isToday ? 'var(--hint)' : 'var(--muted)', cursor: isToday ? 'not-allowed' : 'pointer', fontSize: 14, opacity: isToday ? 0.4 : 1 }}>
+                ›
+              </button>
+            </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
 
