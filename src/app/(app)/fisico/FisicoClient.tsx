@@ -2,6 +2,8 @@
 
 import { useState, useTransition, useEffect } from 'react'
 import { Plus, Trash2, Pencil, Check } from 'lucide-react'
+import { format } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
 import MobileSheet from '@/components/ui/MobileSheet'
 import type { FisicoLog, Profile, CustomCheck } from '@/lib/types'
 import { actionSaveFisico, actionSaveCustomChecks } from './actions'
@@ -174,10 +176,6 @@ export default function FisicoClient({ fisicoLog: initialLog, profile }: Props) 
     setSelectedDate(d.toISOString().split('T')[0])
   }
 
-  function handleDateChange(date: string) {
-    setSelectedDate(date)
-  }
-
   function update<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
     setSaved(false)
     setForm(prev => ({ ...prev, [key]: val }))
@@ -243,7 +241,6 @@ export default function FisicoClient({ fisicoLog: initialLog, profile }: Props) 
   const pesoAtual = form.peso
   const diffPeso = pesoAtual && pesoPrev ? (pesoAtual - pesoPrev) : null
 
-  const isToday = selectedDate === TODAY
   const completedCount = customChecks.filter(c => (form.checks ?? []).includes(c.label)).length
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -262,28 +259,24 @@ export default function FisicoClient({ fisicoLog: initialLog, profile }: Props) 
         </div>
       </div>
 
-      {/* Date navigator */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '12px 16px', marginBottom: 20 }}>
-              <button onClick={() => changeDate(-1)} style={{ padding: '6px 10px', borderRadius: 'var(--radius)', background: 'none', border: '1px solid var(--border2)', color: 'var(--muted)', cursor: 'pointer', fontSize: 14 }}>
-                ‹
-              </button>
-              <span 
-                onClick={() => handleDateChange(TODAY)}
-                style={{ 
-                  fontWeight: 600, fontSize: 14, minWidth: 220, textAlign: 'center', color: 'var(--text)',
-                  cursor: 'pointer',
-                  textDecoration: 'underline',
-                  textDecorationColor: 'var(--accent)',
-                  textUnderlineOffset: 2,
-                }}
-                title="Clique para ir para hoje"
-              >
-                {isToday ? 'Hoje' : new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
-              </span>
-              <button onClick={() => changeDate(1)} disabled={isToday} style={{ padding: '6px 10px', borderRadius: 'var(--radius)', background: 'none', border: '1px solid var(--border2)', color: isToday ? 'var(--hint)' : 'var(--muted)', cursor: isToday ? 'not-allowed' : 'pointer', fontSize: 14, opacity: isToday ? 0.4 : 1 }}>
-                ›
-              </button>
-            </div>
+      {/* Seletor de data (padrão do app: input date + botão Hoje) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
+        <input
+          type="date"
+          value={selectedDate}
+          max={TODAY}
+          onChange={e => setSelectedDate(e.target.value)}
+          style={{ ...inputStyle, maxWidth: 180 }}
+        />
+        {selectedDate !== TODAY && (
+          <button onClick={() => setSelectedDate(TODAY)} style={{ ...btnS, ...btnSm }}>
+            Hoje
+          </button>
+        )}
+        <span style={{ fontSize: 12, color: 'var(--muted)', fontFamily: 'var(--font-dm-mono)' }}>
+          {format(new Date(selectedDate + 'T00:00:00'), "EEEE, d 'de' MMMM", { locale: ptBR })}
+        </span>
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
 
