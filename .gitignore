@@ -61,3 +61,8 @@ logs/
 # Build / dist
 build/
 dist/
+
+# Local docs / config (não commita)
+IDEA.md
+SOUL.md
+.hermes/
