@@ -38,6 +38,13 @@ export interface DiaProtocolo {
   tags: string[]
 }
 
+export interface Suplemento {
+  id: string
+  nome: string
+  dose: string
+  timing: string
+}
+
 export interface Protocolo {
   user_id?: string
   nome: string
@@ -48,6 +55,7 @@ export interface Protocolo {
   cardapio_ativo_id: string
   dias: DiaProtocolo[]
   duracao_semanas?: number
+  suplementos: Suplemento[]
   updated_at?: string
 }
 
@@ -242,6 +250,11 @@ export const defaultProtocolo: Omit<Protocolo, 'user_id'> = {
   data_inicio: new Date().toISOString().split('T')[0],
   cardapio_ativo_id: 'padrao',
   duracao_semanas: 12,
+  suplementos: [
+    { id: 'sup_creatina', nome: 'Creatina', dose: '5g', timing: 'Qualquer horário' },
+    { id: 'sup_whey', nome: 'Whey', dose: '30g', timing: 'Pós-treino' },
+    { id: 'sup_cafeina', nome: 'Cafeína', dose: '200mg', timing: 'Pré-treino (opcional)' },
+  ],
   dias: [
     { id: crypto.randomUUID?.() ?? '1', dia: 'Seg', nome: 'Treino A', tipo: 'Push', cor: '#2a6ab5', tags: ['Peito', 'Tríceps', 'Ombro'] },
     { id: crypto.randomUUID?.() ?? '2', dia: 'Ter', nome: 'Treino B', tipo: 'Pull', cor: '#4a9e5a', tags: ['Costas', 'Bíceps'] },

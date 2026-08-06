@@ -45,5 +45,6 @@ export async function dbLoadProtocolo(userId: string): Promise<Protocolo | null>
     data_inicio: data.data_inicio,
     cardapio_ativo_id: data.cardapio_ativo_id,
     dias: data.dias,
+    suplementos: data.suplementos ?? [],
   }
 }

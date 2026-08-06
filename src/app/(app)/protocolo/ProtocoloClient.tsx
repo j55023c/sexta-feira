@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useMemo, useEffect } from 'react'
 import Link from 'next/link'
-import type { Protocolo, Profile, HistoricoFase, Fase, DiaProtocolo } from '@/lib/types'
+import type { Protocolo, Profile, HistoricoFase, Fase, DiaProtocolo, Suplemento } from '@/lib/types'
 import MobileSheet from '@/components/ui/MobileSheet'
 import { actionSaveProtocolo, actionMudarFase } from './actions'
 
@@ -52,25 +52,6 @@ const FASE_INFO: Record<Fase, { label: string; icon: string; tagBg: string; tagC
   bulking:    { label: 'Bulking',     icon: '📈', tagBg: 'var(--blue-bg)',   tagColor: 'var(--blue)'  },
   cutting:    { label: 'Cutting',     icon: '🔥', tagBg: 'var(--amber-bg)', tagColor: 'var(--amber)' },
   manutencao: { label: 'Manutenção',  icon: '⚖️', tagBg: 'var(--green-bg)', tagColor: 'var(--green)' },
-}
-
-// Defaults suplementação (fallback inicial)
-const DEFAULT_SUPLEMENTOS: Record<Fase, { id: string; nome: string; dose: string; timing: string }[]> = {
-  cutting: [
-    { id: 'sup_creatina', nome: 'Creatina', dose: '5g', timing: 'Qualquer horário' },
-    { id: 'sup_whey', nome: 'Whey', dose: '30g', timing: 'Pós-treino' },
-    { id: 'sup_cafeina', nome: 'Cafeína', dose: '200mg', timing: 'Pré-treino (opcional)' },
-  ],
-  bulking: [
-    { id: 'sup_creatina', nome: 'Creatina', dose: '5g', timing: 'Qualquer horário' },
-    { id: 'sup_whey', nome: 'Whey', dose: '30g', timing: 'Pós-treino' },
-    { id: 'sup_carbo', nome: 'Carbo em pó', dose: '30–50g', timing: 'Intra/pós-treino' },
-  ],
-  manutencao: [
-    { id: 'sup_creatina', nome: 'Creatina', dose: '5g', timing: 'Qualquer horário' },
-    { id: 'sup_omega3', nome: 'Ômega-3', dose: '2g', timing: 'Com almoço' },
-    { id: 'sup_vitd', nome: 'Vitamina D', dose: '2000–5000 UI', timing: 'Com café da manhã' },
-  ],
 }
 
 function generateId() {
@@ -127,12 +108,18 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 // ── Suplementos Tab ────────────────────────────────────────────────────────────
-function SuplementosTab({ fase, fi }: { fase: Fase; fi: typeof FASE_INFO[Fase] }) {
-  const [suplementos, setSuplementos] = useState<{ id: string; nome: string; dose: string; timing: string }[]>(() => 
-    DEFAULT_SUPLEMENTOS[fase]
-  )
+function SuplementosTab({ 
+  suplementos: suplementosIniciais, 
+  onSuplementosChange, 
+  fi 
+}: { 
+  suplementos: Suplemento[]; 
+  onSuplementosChange: (sups: Suplemento[]) => void;
+  fi: typeof FASE_INFO[Fase]; 
+}) {
+  const [suplementos, setSuplementos] = useState<Suplemento[]>(suplementosIniciais)
   const [showForm, setShowForm] = useState(false)
-  const [editingSup, setEditingSup] = useState<{ id: string; nome: string; dose: string; timing: string } | null>(null)
+  const [editingSup, setEditingSup] = useState<Suplemento | null>(null)
   const [form, setForm] = useState({ nome: '', dose: '', timing: '' })
   const hoje = new Date().toISOString().split('T')[0]
   const [marcados, setMarcados] = useState<Record<string, boolean>>(() => {
@@ -153,21 +140,24 @@ function SuplementosTab({ fase, fi }: { fase: Fase; fi: typeof FASE_INFO[Fase] }
     e.preventDefault()
     if (!form.nome.trim()) return
 
-    let updated: typeof suplementos
+    let updated: Suplemento[]
     if (editingSup) {
       updated = suplementos.map(s => s.id === editingSup.id ? { ...s, ...form } : s)
     } else {
-      const novo = { id: generateId(), ...form }
+      const novo: Suplemento = { id: generateId(), ...form }
       updated = [...suplementos, novo]
     }
     setSuplementos(updated)
+    onSuplementosChange(updated)
     setShowForm(false)
     setEditingSup(null)
     setForm({ nome: '', dose: '', timing: '' })
   }
 
   function handleDeleteSup(id: string) {
-    setSuplementos(prev => prev.filter(s => s.id !== id))
+    const updated = suplementos.filter(s => s.id !== id)
+    setSuplementos(updated)
+    onSuplementosChange(updated)
   }
 
   const completedCount = suplementos.filter(s => marcados[s.nome]).length
@@ -264,7 +254,7 @@ function SuplementosTab({ fase, fi }: { fase: Fase; fi: typeof FASE_INFO[Fase] }
         </div>
 
         <div style={{ marginTop: 10, padding: '10px 12px', background: 'var(--surface2)', borderRadius: 'var(--radius)', fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.6 }}>
-          <strong style={{ color: 'var(--text)' }}>Nota:</strong> marcas são salvas localmente por dia (localStorage). Não sincronizam entre dispositivos.
+          <strong style={{ color: 'var(--text)' }}>Nota:</strong> A lista de suplementos sincroniza entre dispositivos. As marcações diárias (✓) são locais por dia.
         </div>
       </div>
       <div style={{ borderLeft: '3px solid var(--accent)', padding: '9px 12px', background: 'var(--accent-glow-10)', borderRadius: '0 var(--radius) var(--radius) 0', fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.65 }}>
@@ -327,6 +317,7 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
     nome: 'Meu protocolo', desc_texto: '', cardio: '', fase: 'cutting',
     data_inicio: new Date().toISOString().split('T')[0],
     cardapio_ativo_id: 'padrao', dias: [], duracao_semanas: 12,
+    suplementos: [],
   })
   const [tab, setTab] = useState<Tab>('semana')
   const [showModalFase, setShowModalFase] = useState(false)
@@ -732,9 +723,13 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
             )}
 
             {/* Tab: Suplementos */}
-                        {tab === 'suplementos' && (
-                          <SuplementosTab fase={protocolo.fase} fi={fi} />
-                        )}
+                                    {tab === 'suplementos' && (
+                                      <SuplementosTab 
+                                        suplementos={protocolo.suplementos ?? []} 
+                                        onSuplementosChange={(sups) => setProtocolo(prev => ({ ...prev, suplementos: sups }))}
+                                        fi={fi} 
+                                      />
+                                    )}
 
             {/* Tab: Editar */}
                         {tab === 'editar' && (
