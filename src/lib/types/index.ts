@@ -30,9 +30,11 @@ export interface Profile {
 
 // ── Protocolo ──
 export interface DiaProtocolo {
+  id: string
   dia: string
   nome: string
-  tipo: 'up' | 'lw' | 'rest' | 'free'
+  tipo: string
+  cor: string
   tags: string[]
 }
 
@@ -45,8 +47,21 @@ export interface Protocolo {
   data_inicio: string
   cardapio_ativo_id: string
   dias: DiaProtocolo[]
+  duracao_semanas?: number
   updated_at?: string
 }
+
+// Paleta fixa de cores para tipos de treino (ordem = sugestão de uso)
+export const TIPO_CORES = [
+  '#2a6ab5', // azul — Upper / Push
+  '#4a9e5a', // verde — Lower / Pull
+  '#e07b2a', // laranja — Legs
+  '#c0392b', // vermelho — Full-body
+  '#8e44ad', // roxo — Cardio
+  '#16a085', // teal — Core / Mobility
+  '#f39c12', // amarelo — HIIT / Condicionamento
+  '#95a5a6', // cinza — Rest / Livre
+] as const
 
 // ── Cardápio ──
 export interface RefeicaoCustom {
@@ -226,13 +241,14 @@ export const defaultProtocolo: Omit<Protocolo, 'user_id'> = {
   fase: 'cutting',
   data_inicio: new Date().toISOString().split('T')[0],
   cardapio_ativo_id: 'padrao',
+  duracao_semanas: 12,
   dias: [
-    { dia: 'Seg', nome: 'Treino A', tipo: 'up', tags: ['Treino A'] },
-    { dia: 'Ter', nome: 'Treino B', tipo: 'lw', tags: ['Treino B'] },
-    { dia: 'Qua', nome: 'Descanso', tipo: 'rest', tags: ['Descanso'] },
-    { dia: 'Qui', nome: 'Treino A', tipo: 'up', tags: ['Treino A'] },
-    { dia: 'Sex', nome: 'Treino B', tipo: 'lw', tags: ['Treino B'] },
-    { dia: 'Sáb', nome: 'Livre', tipo: 'free', tags: ['Descanso'] },
-    { dia: 'Dom', nome: 'Livre', tipo: 'free', tags: ['Descanso'] },
+    { id: crypto.randomUUID?.() ?? '1', dia: 'Seg', nome: 'Treino A', tipo: 'Push', cor: '#2a6ab5', tags: ['Peito', 'Tríceps', 'Ombro'] },
+    { id: crypto.randomUUID?.() ?? '2', dia: 'Ter', nome: 'Treino B', tipo: 'Pull', cor: '#4a9e5a', tags: ['Costas', 'Bíceps'] },
+    { id: crypto.randomUUID?.() ?? '3', dia: 'Qua', nome: 'Descanso', tipo: 'Rest', cor: '#95a5a6', tags: ['Descanso'] },
+    { id: crypto.randomUUID?.() ?? '4', dia: 'Qui', nome: 'Treino C', tipo: 'Legs', cor: '#e07b2a', tags: ['Perna', 'Glúteo'] },
+    { id: crypto.randomUUID?.() ?? '5', dia: 'Sex', nome: 'Treino D', tipo: 'Full-body', cor: '#c0392b', tags: ['Corpo todo'] },
+    { id: crypto.randomUUID?.() ?? '6', dia: 'Sáb', nome: 'Cárdio', tipo: 'Cardio', cor: '#8e44ad', tags: ['HIIT', 'LISS'] },
+    { id: crypto.randomUUID?.() ?? '7', dia: 'Dom', nome: 'Livre', tipo: 'Livre', cor: '#95a5a6', tags: ['Descanso'] },
   ],
 }
