@@ -495,11 +495,19 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
     }, [protocolo.data_inicio, protocolo.duracao_semanas])
 
     function handleProgressoDataChange(campo: 'inicio' | 'fim', value: string) {
-      if (campo === 'inicio') setProgressoDataInicio(value)
-      else setProgressoDataFim(value)
-      // Atualiza o protocolo também
-      setProtocolo(prev => ({ ...prev, data_inicio: campo === 'inicio' ? value : prev.data_inicio }))
-    }
+          if (campo === 'inicio') {
+            setProgressoDataInicio(value)
+            setProtocolo(prev => ({ ...prev, data_inicio: value }))
+          } else {
+            setProgressoDataFim(value)
+            // Calcula duracao_semanas a partir da diferença entre fim e início
+            const inicio = new Date(protocolo.data_inicio)
+            const fim = new Date(value)
+            const diffDias = Math.max(1, Math.ceil((fim.getTime() - inicio.getTime()) / 86400000))
+            const semanas = Math.ceil(diffDias / 7)
+            setProtocolo(prev => ({ ...prev, duracao_semanas: semanas }))
+          }
+        }
 
   return (
     <div>
@@ -781,8 +789,8 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
                                 <textarea name="desc" rows={2} defaultValue={protocolo.desc_texto} style={{ ...inputStyle, resize: 'vertical', minHeight: 60 }} />
                               </Field>
                               <Field label="Duração da fase (semanas)">
-                                <input name="duracao_semanas" type="number" min="1" max="52" defaultValue={protocolo.duracao_semanas ?? ''} style={inputStyle} />
-                              </Field>
+                                                              <input name="duracao_semanas" type="number" min="1" max="52" value={protocolo.duracao_semanas ?? ''} onChange={e => setProtocolo(prev => ({ ...prev, duracao_semanas: Number(e.target.value) || undefined }))} style={inputStyle} />
+                                                            </Field>
                             </div>
 
                             <div style={{ ...card, marginBottom: 14 }}>
