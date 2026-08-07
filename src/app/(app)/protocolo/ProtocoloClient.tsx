@@ -235,13 +235,18 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
   function toggleSuplCheck(suplId: string) {
     setSuplementosChecks(prev => {
       const dayChecks = { ...prev[selectedSuplDate] }
-      dayChecks[suplId] = !dayChecks[suplId]
-      return { ...prev, [selectedSuplDate]: dayChecks }
+      const newValue = !dayChecks[suplId]
+      dayChecks[suplId] = newValue
+      const next = { ...prev, [selectedSuplDate]: dayChecks }
+      // Salva imediatamente com o valor NOVO (evita race condition)
+      saveSuplChecks(next)
+      return next
     })
   }
 
-  async function saveSuplChecks() {
-    const updated = { ...protocolo, suplementos_checks: { ...protocolo.suplementos_checks, [selectedSuplDate]: suplementosChecks[selectedSuplDate] } }
+  async function saveSuplChecks(nextChecks?: Record<string, Record<string, boolean>>) {
+    const checksToSave = nextChecks ?? suplementosChecks
+    const updated = { ...protocolo, suplementos_checks: { ...protocolo.suplementos_checks, [selectedSuplDate]: checksToSave[selectedSuplDate] } }
     setProtocolo(updated)
     const res = await saveProtocoloToDB(updated)
     if (res.error) console.error('[Supl Checks] Erro:', res.error)
