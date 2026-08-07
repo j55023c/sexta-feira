@@ -133,12 +133,20 @@ interface Props {
 type Tab = 'semana' | 'progresso' | 'suplementos' | 'cardio' | 'metas' | 'regras' | 'editar'
 
 // ── Helpers de salvamento (client-side) ───────────────────────────────────────
+function sanitizeProtocolo(protocolo: Protocolo): Protocolo {
+  return {
+    ...protocolo,
+    duracao_semanas: protocolo.duracao_semanas != null ? Math.floor(Number(protocolo.duracao_semanas)) : undefined,
+  }
+}
+
 async function saveProtocoloToDB(protocolo: Protocolo): Promise<{ success?: boolean; error?: string }> {
   const sb = createClient()
   const { data: { user } } = await sb.auth.getUser()
   if (!user) return { error: 'Não autenticado' }
 
-  const payload = { ...protocolo, user_id: user.id, updated_at: new Date().toISOString() }
+  const clean = sanitizeProtocolo(protocolo)
+  const payload = { ...clean, user_id: user.id, updated_at: new Date().toISOString() }
   console.log('[saveProtocoloToDB] payload:', JSON.stringify(payload, null, 2))
 
   const { error } = await sb.from('protocolo').upsert(payload, { onConflict: 'user_id' })
@@ -436,7 +444,20 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
               </div>
               <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 12 }}>
                 <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 4 }}>Duração (semanas)</div>
-                <input type="number" min="1" max="52" value={protocolo.duracao_semanas ?? ''} onChange={(e) => setProtocolo(p => ({ ...p, duracao_semanas: e.target.value ? Number(e.target.value) : undefined }))} style={inputStyle} placeholder="Ex: 12" />
+                <input
+                  type="number"
+                  min="1"
+                  max="52"
+                  step="1"
+                  value={protocolo.duracao_semanas ?? ''}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    setProtocolo(p => ({ ...p, duracao_semanas: val ? Math.floor(Number(val)) : undefined }))
+                  }}
+                  style={inputStyle}
+                  placeholder="Ex: 12"
+                  inputMode="numeric"
+                />
               </div>
             </div>
             {(protocolo.data_inicio && protocolo.duracao_semanas) && (() => {
@@ -475,10 +496,10 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
                   <div style={{ background: 'var(--surface2)', borderRadius: 999, height: 8, overflow: 'hidden', marginBottom: 8 }}>
                     <div style={{ width: `${pct}%`, height: '100%', background: 'var(--accent)', borderRadius: 999, transition: 'width 0.3s' }} />
                   </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8, fontSize: 10, color: 'var(--muted)' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, fontSize: 10, color: 'var(--muted)' }}>
                     <span>Início: {new Date(protocolo.data_inicio).toLocaleDateString('pt-BR')}</span>
-                    <span>Fim estimado: {fim.toLocaleDateString('pt-BR')}</span>
-                    <span>{pct}%</span>
+                    <span style={{ textAlign: 'center' }}>Fim: {fim.toLocaleDateString('pt-BR')}</span>
+                    <span style={{ textAlign: 'right' }}>{pct}%</span>
                   </div>
                 </div>
               )
