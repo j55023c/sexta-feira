@@ -635,87 +635,94 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
                   )}
 
             {/* Tab: Progresso */}
-                        {tab === 'progresso' && (
-                          <div>
-                            {progressoEditavel ? (
-                              <>
-                                <div style={{ ...card, marginBottom: 14 }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
-                                    <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: fi.tagBg, color: fi.tagColor, textTransform: 'uppercase', letterSpacing: .8 }}>
-                                      {fi.icon} {protocolo.nome}
-                                    </span>
-                                  </div>
-                                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 10, marginBottom: 14 }}>
-                                    <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 12, textAlign: 'center' }}>
-                                      <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 4 }}>Início</div>
-                                      <input
-                                        type="date"
-                                        value={progressoDataInicio}
-                                        onChange={e => handleProgressoDataChange('inicio', e.target.value)}
-                                        style={{ ...inputStyle, fontSize: 16, fontWeight: 800, fontFamily: 'var(--font-dm-mono)', textAlign: 'center', color: 'var(--text)' }}
-                                      />
-                                    </div>
-                                    <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 12, textAlign: 'center' }}>
-                                      <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 4 }}>Fim</div>
-                                      <input
-                                        type="date"
-                                        value={progressoDataFim}
-                                        onChange={e => handleProgressoDataChange('fim', e.target.value)}
-                                        style={{ ...inputStyle, fontSize: 16, fontWeight: 800, fontFamily: 'var(--font-dm-mono)', textAlign: 'center', color: 'var(--accent)' }}
-                                      />
-                                    </div>
-                                    <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 12, textAlign: 'center' }}>
-                                      <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 4 }}>Semanas totais</div>
-                                      <div style={{ fontSize: 16, fontWeight: 800, fontFamily: 'var(--font-dm-mono)', color: 'var(--text)' }}>{progressoEditavel.semanasTotais}</div>
-                                    </div>
-                                    <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 12, textAlign: 'center' }}>
-                                      <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 4 }}>Semanas passadas</div>
-                                      <div style={{ fontSize: 16, fontWeight: 800, fontFamily: 'var(--font-dm-mono)', color: 'var(--blue)' }}>{progressoEditavel.semanasPassadas}</div>
-                                    </div>
-                                    <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 12, textAlign: 'center' }}>
-                                      <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 4 }}>Semanas restantes</div>
-                                      <div style={{ fontSize: 16, fontWeight: 800, fontFamily: 'var(--font-dm-mono)', color: 'var(--amber)' }}>{progressoEditavel.semanasRestantes}</div>
-                                    </div>
-                                    <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 12, textAlign: 'center' }}>
-                                      <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 4 }}>Dias restantes</div>
-                                      <div style={{ fontSize: 16, fontWeight: 800, fontFamily: 'var(--font-dm-mono)', color: 'var(--red)' }}>{progressoEditavel.diasRestantes}</div>
-                                    </div>
-                                  </div>
-                                  {/* Barra de progresso */}
-                                  <div style={{ marginBottom: 8 }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 12, fontWeight: 700 }}>
-                                      <span>Progresso da fase</span>
-                                      <span style={{ color: 'var(--accent)' }}>{progressoEditavel.pct}%</span>
-                                    </div>
-                                    <div style={{ height: 10, background: 'var(--surface2)', borderRadius: 999, overflow: 'hidden' }}>
-                                      <div
-                                        style={{
-                                          width: `${progressoEditavel.pct}%`,
-                                          height: '100%',
-                                          background: 'linear-gradient(90deg,var(--accent),var(--accent2))',
-                                          borderRadius: 999,
-                                          transition: 'width 0.4s ease',
-                                        }}
-                                      />
-                                    </div>
-                                  </div>
-                                  <div style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.6 }}>
-                                    Semana <strong style={{ color: 'var(--text)' }}>{progressoEditavel.semanasPassadas}</strong> de <strong style={{ color: 'var(--text)' }}>{progressoEditavel.semanasTotais}</strong> · {progressoEditavel.diasRestantes} dias para o fim estimado
-                                  </div>
-                                </div>
-                                                                <div style={{ borderLeft: '3px solid var(--accent)', padding: '9px 12px', background: 'var(--accent-glow-10)', borderRadius: '0 var(--radius) var(--radius) 0', fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.65 }}>
-                                                                  <strong style={{ color: 'var(--text)' }}>Dica:</strong> Edite as datas acima — o progresso recalcula automaticamente. A data de início também atualiza o protocolo.
-                                                                </div>
-                                                              </>
-                                                            ) : (
-                                                              <div style={{ ...card, textAlign: 'center', padding: 30 }}>
-                                                                <div style={{ fontSize: 28, marginBottom: 8 }}>📈</div>
-                                                                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6, color: 'var(--text)' }}>Progresso não ativado</div>
-                                                                <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 16, maxWidth: 300, marginLeft: 'auto', marginRight: 'auto' }}>
-                                                                  Defina a data de início e fim acima para ver o progresso da fase, barra animada e contagem regressiva.
-                                                                </div>
-                                                              </div>
-                                                            )}
+                                    {tab === 'progresso' && (
+                                      <div>
+                                        <div style={{ ...card, marginBottom: 14 }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+                                            <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: fi.tagBg, color: fi.tagColor, textTransform: 'uppercase', letterSpacing: .8 }}>
+                                              {fi.icon} {protocolo.nome}
+                                            </span>
+                                          </div>
+                                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 10, marginBottom: 14 }}>
+                                            <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 12, textAlign: 'center' }}>
+                                              <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 4 }}>Início</div>
+                                              <input
+                                                type="date"
+                                                value={progressoDataInicio}
+                                                onChange={e => handleProgressoDataChange('inicio', e.target.value)}
+                                                style={{ ...inputStyle, fontSize: 16, fontWeight: 800, fontFamily: 'var(--font-dm-mono)', textAlign: 'center', color: 'var(--text)' }}
+                                              />
+                                            </div>
+                                            <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 12, textAlign: 'center' }}>
+                                              <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 4 }}>Fim</div>
+                                              <input
+                                                type="date"
+                                                value={progressoDataFim}
+                                                onChange={e => handleProgressoDataChange('fim', e.target.value)}
+                                                style={{ ...inputStyle, fontSize: 16, fontWeight: 800, fontFamily: 'var(--font-dm-mono)', textAlign: 'center', color: 'var(--accent)' }}
+                                              />
+                                            </div>
+                                            {progressoEditavel && (
+                                              <>
+                                                <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 12, textAlign: 'center' }}>
+                                                  <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 4 }}>Semanas totais</div>
+                                                  <div style={{ fontSize: 16, fontWeight: 800, fontFamily: 'var(--font-dm-mono)', color: 'var(--text)' }}>{progressoEditavel.semanasTotais}</div>
+                                                </div>
+                                                <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 12, textAlign: 'center' }}>
+                                                  <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 4 }}>Semanas passadas</div>
+                                                  <div style={{ fontSize: 16, fontWeight: 800, fontFamily: 'var(--font-dm-mono)', color: 'var(--blue)' }}>{progressoEditavel.semanasPassadas}</div>
+                                                </div>
+                                                <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 12, textAlign: 'center' }}>
+                                                  <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 4 }}>Semanas restantes</div>
+                                                  <div style={{ fontSize: 16, fontWeight: 800, fontFamily: 'var(--font-dm-mono)', color: 'var(--amber)' }}>{progressoEditavel.semanasRestantes}</div>
+                                                </div>
+                                                <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 12, textAlign: 'center' }}>
+                                                  <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 4 }}>Dias restantes</div>
+                                                  <div style={{ fontSize: 16, fontWeight: 800, fontFamily: 'var(--font-dm-mono)', color: 'var(--red)' }}>{progressoEditavel.diasRestantes}</div>
+                                                </div>
+                                              </>
+                                            )}
+                                          </div>
+                                          {progressoEditavel && (
+                                            <>
+                                              {/* Barra de progresso */}
+                                              <div style={{ marginBottom: 8 }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 12, fontWeight: 700 }}>
+                                                  <span>Progresso da fase</span>
+                                                  <span style={{ color: 'var(--accent)' }}>{progressoEditavel.pct}%</span>
+                                                </div>
+                                                <div style={{ height: 10, background: 'var(--surface2)', borderRadius: 999, overflow: 'hidden' }}>
+                                                  <div
+                                                    style={{
+                                                      width: `${progressoEditavel.pct}%`,
+                                                      height: '100%',
+                                                      background: 'linear-gradient(90deg,var(--accent),var(--accent2))',
+                                                      borderRadius: 999,
+                                                      transition: 'width 0.4s ease',
+                                                    }}
+                                                  />
+                                                </div>
+                                              </div>
+                                              <div style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.6 }}>
+                                                Semana <strong style={{ color: 'var(--text)' }}>{progressoEditavel.semanasPassadas}</strong> de <strong style={{ color: 'var(--text)' }}>{progressoEditavel.semanasTotais}</strong> · {progressoEditavel.diasRestantes} dias para o fim estimado
+                                              </div>
+                                            </>
+                                          )}
+                                          {!progressoEditavel && (
+                                            <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--muted)' }}>
+                                              <div style={{ fontSize: 28, marginBottom: 8 }}>📈</div>
+                                              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6, color: 'var(--text)' }}>Progresso não calculado</div>
+                                              <div style={{ fontSize: 12.5, marginBottom: 16, maxWidth: 300, marginLeft: 'auto', marginRight: 'auto' }}>
+                                                Preencha as datas de <strong>Início</strong> e <strong>Fim</strong> acima para ver o progresso da fase, barra animada e contagem regressiva.
+                                              </div>
+                                            </div>
+                                          )}
+                                          <div style={{ borderLeft: '3px solid var(--accent)', padding: '9px 12px', background: 'var(--accent-glow-10)', borderRadius: '0 var(--radius) var(--radius) 0', fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.65 }}>
+                                            <strong style={{ color: 'var(--text)' }}>Dica:</strong> Edite as datas acima — o progresso recalcula automaticamente. A data de início também atualiza o protocolo.
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
                           </div>
                         )}
 
@@ -880,8 +887,9 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
                     <button type="submit" disabled={isPending} style={{ ...btnP, ...btnSm }}>Confirmar</button>
                   </div>
                 </form>
-              </MobileSheet>
-            )}
-    </div>
-  )
-}
+                              </MobileSheet>
+                            )}
+
+                    </div>
+                  )
+                }
