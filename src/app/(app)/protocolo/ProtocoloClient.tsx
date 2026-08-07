@@ -374,28 +374,30 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
       }
 
       // ── Auto-save debounced ─────────────────────────────────────────────────────
-      const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-      const isSavingRef = useRef(false)
+            const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+            const isSavingRef = useRef(false)
+            const protocoloRef = useRef(protocolo)
+            protocoloRef.current = protocolo
 
-      function triggerAutoSave() {
-        if (isSavingRef.current) return
-        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
-        saveTimeoutRef.current = setTimeout(() => {
-          isSavingRef.current = true
-          startTransition(async () => {
-            try {
-              await actionSaveProtocolo(protocolo)
-            } finally {
-              isSavingRef.current = false
+            function triggerAutoSave() {
+              if (isSavingRef.current) return
+              if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+              saveTimeoutRef.current = setTimeout(() => {
+                isSavingRef.current = true
+                startTransition(async () => {
+                  try {
+                    await actionSaveProtocolo(protocoloRef.current)
+                  } finally {
+                    isSavingRef.current = false
+                  }
+                })
+              }, 800) // debounce 800ms
             }
-          })
-        }, 800) // debounce 800ms
-      }
 
-      // Auto-save quando campos críticos mudam
-      useEffect(() => {
-        triggerAutoSave()
-      }, [protocolo.duracao_semanas, protocolo.data_inicio, protocolo.suplementos, protocolo.suplementos_checks, protocolo.dias])
+            // Auto-save quando campos críticos mudam
+            useEffect(() => {
+              triggerAutoSave()
+            }, [protocolo.duracao_semanas, protocolo.data_inicio, protocolo.suplementos, protocolo.suplementos_checks, protocolo.dias])
 
       // ── Mudar fase ──────────────────────────────────────────────────────────────
       function handleMudarFase(e: React.FormEvent<HTMLFormElement>) {
@@ -483,25 +485,46 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
     }, [progressoDataInicio, progressoDataFim])
 
     // Sincroniza com protocolo quando ele muda (ex: carregou do banco)
-    useEffect(() => {
-      setProgressoDataInicio(protocolo.data_inicio)
-      if (protocolo.duracao_semanas) {
-        const fim = new Date(protocolo.data_inicio)
-        fim.setDate(fim.getDate() + protocolo.duracao_semanas * 7)
-        setProgressoDataFim(fim.toISOString().split('T')[0])
-      } else {
-        setProgressoDataFim('')
-      }
-    }, [protocolo.data_inicio, protocolo.duracao_semanas])
+        useEffect(() => {
+          setProgressoDataInicio(protocolo.data_inicio)
+          if (protocolo.duracao_semanas) {
+            const fim = new Date(protocolo.data_inicio)
+            fim.setDate(fim.getDate() + protocolo.duracao_semanas * 7)
+            setProgressoDataFim(fim.toISOString().split('T')[0])
+          } else {
+            setProgressoDataFim('')
+          }
+        }, [protocolo.data_inicio, protocolo.duracao_semanas])
+
+        // Validação de datas: impede fim < início
+        useEffect(() => {
+          if (progressoDataInicio && progressoDataFim) {
+            const inicio = new Date(progressoDataInicio)
+            const fim = new Date(progressoDataFim)
+            if (fim < inicio) {
+              // Ajusta fim para ser igual a início + duração atual
+              const duracaoAtual = protocolo.duracao_semanas ?? 12
+              const novoFim = new Date(progressoDataInicio)
+              novoFim.setDate(novoFim.getDate() + duracaoAtual * 7)
+              setProgressoDataFim(novoFim.toISOString().split('T')[0])
+            }
+          }
+        }, [progressoDataInicio, progressoDataFim])
 
     function handleProgressoDataChange(campo: 'inicio' | 'fim', value: string) {
           if (campo === 'inicio') {
             setProgressoDataInicio(value)
-            setProtocolo(prev => ({ ...prev, data_inicio: value }))
+            // Mantém a duração atual recalculando a data fim
+            const duracaoAtual = protocolo.duracao_semanas ?? 12
+            const novoFim = new Date(value)
+            novoFim.setDate(novoFim.getDate() + duracaoAtual * 7)
+            const fimStr = novoFim.toISOString().split('T')[0]
+            setProgressoDataFim(fimStr)
+            setProtocolo(prev => ({ ...prev, data_inicio: value, duracao_semanas: duracaoAtual }))
           } else {
             setProgressoDataFim(value)
-            // Calcula duracao_semanas a partir da diferença entre fim e início
-            const inicio = new Date(protocolo.data_inicio)
+            // Calcula duracao_semanas a partir da diferença entre fim e início (usando estados locais)
+            const inicio = new Date(progressoDataInicio)
             const fim = new Date(value)
             const diffDias = Math.max(1, Math.ceil((fim.getTime() - inicio.getTime()) / 86400000))
             const semanas = Math.ceil(diffDias / 7)
