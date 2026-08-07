@@ -288,6 +288,92 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
         </div>
       )}
 
+      {/* Tab: Progresso */}
+      {tab === 'progresso' && (
+        <div>
+          <div style={{ ...card, marginBottom: 14 }}>
+            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 12 }}>Progresso do protocolo</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10 }}>
+              <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 12 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 4 }}>Início</div>
+                <input type="date" value={protocolo.data_inicio} onChange={(e) => setProtocolo(p => ({ ...p, data_inicio: e.target.value }))} style={inputStyle} />
+              </div>
+              <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 12 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 4 }}>Duração (semanas)</div>
+                <input type="number" min="1" max="52" value={protocolo.duracao_semanas ?? ''} onChange={(e) => setProtocolo(p => ({ ...p, duracao_semanas: e.target.value ? Number(e.target.value) : undefined }))} style={inputStyle} placeholder="Ex: 12" />
+              </div>
+            </div>
+            {(protocolo.data_inicio && protocolo.duracao_semanas) && (() => {
+              const inicio = new Date(protocolo.data_inicio);
+              const fim = new Date(inicio);
+              fim.setDate(fim.getDate() + protocolo.duracao_semanas * 7);
+              const hoje = new Date();
+              hoje.setHours(0,0,0,0);
+              const totalDias = Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24));
+              const diasPassados = Math.ceil((hoje.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24));
+              const pct = Math.max(0, Math.min(100, Math.round((diasPassados / totalDias) * 100)));
+              const semanasTotais = protocolo.duracao_semanas;
+              const semanasPassadas = Math.floor(diasPassados / 7);
+              const semanasRestantes = Math.max(0, semanasTotais - semanasPassadas);
+              const diasRestantes = Math.max(0, totalDias - diasPassados);
+              return (
+                <div style={{ marginTop: 16 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 12 }}>
+                    <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 12, textAlign: 'center' }}>
+                      <div style={{ fontSize: 22, fontWeight: 800, fontFamily: 'var(--font-dm-mono)', color: 'var(--text)' }}>{semanasTotais}</div>
+                      <div style={{ fontSize: 10, color: 'var(--muted)' }}>semanas total</div>
+                    </div>
+                    <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 12, textAlign: 'center' }}>
+                      <div style={{ fontSize: 22, fontWeight: 800, fontFamily: 'var(--font-dm-mono)', color: 'var(--blue)' }}>{semanasPassadas}</div>
+                      <div style={{ fontSize: 10, color: 'var(--muted)' }}>semanas passadas</div>
+                    </div>
+                    <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 12, textAlign: 'center' }}>
+                      <div style={{ fontSize: 22, fontWeight: 800, fontFamily: 'var(--font-dm-mono)', color: 'var(--amber)' }}>{semanasRestantes}</div>
+                      <div style={{ fontSize: 10, color: 'var(--muted)' }}>semanas restantes</div>
+                    </div>
+                    <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 12, textAlign: 'center' }}>
+                      <div style={{ fontSize: 22, fontWeight: 800, fontFamily: 'var(--font-dm-mono)', color: 'var(--red)' }}>{diasRestantes}</div>
+                      <div style={{ fontSize: 10, color: 'var(--muted)' }}>dias para o fim</div>
+                    </div>
+                  </div>
+                  <div style={{ background: 'var(--surface2)', borderRadius: 999, height: 8, overflow: 'hidden' }}>
+                    <div style={{ width: `${pct}%`, height: '100%', background: 'var(--accent)', borderRadius: 999, transition: 'width 0.3s' }} />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 11, color: 'var(--muted)' }}>
+                    <span>Início: {new Date(protocolo.data_inicio).toLocaleDateString('pt-BR')}</span>
+                    <span>Fim estimado: {fim.toLocaleDateString('pt-BR')}</span>
+                    <span>{pct}%</span>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* Tab: Suplementos */}
+      {tab === 'suplementos' && (
+        <div>
+          <div style={{ ...card, marginBottom: 14 }}>
+            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 12 }}>Suplementação diária</div>
+            {protocolo.suplementos.map((s, i) => (
+              <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: i < protocolo.suplementos.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                <input type="checkbox" style={{ width: 20, height: 20, accentColor: 'var(--accent)' }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>{s.nome}</div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>{s.dose} {s.timing ? `· ${s.timing}` : ''}</div>
+                </div>
+              </div>
+            ))}
+            {protocolo.suplementos.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '20px', color: 'var(--muted)' }}>
+                Nenhum suplemento cadastrado. Adicione na aba Editar.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Tab: Cárdio */}
       {tab === 'cardio' && (
         <div>
