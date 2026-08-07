@@ -56,6 +56,7 @@ export interface Protocolo {
   dias: DiaProtocolo[]
   duracao_semanas?: number
   suplementos: Suplemento[]
+  suplementos_checks?: Record<string, string[]> // date -> suplemento ids marcados
   updated_at?: string
 }
 
@@ -255,6 +256,7 @@ export const defaultProtocolo: Omit<Protocolo, 'user_id'> = {
     { id: 'sup_whey', nome: 'Whey', dose: '30g', timing: 'Pós-treino' },
     { id: 'sup_cafeina', nome: 'Cafeína', dose: '200mg', timing: 'Pré-treino (opcional)' },
   ],
+  suplementos_checks: {},
   dias: [
     { id: crypto.randomUUID?.() ?? '1', dia: 'Seg', nome: 'Treino A', tipo: 'Push', cor: '#2a6ab5', tags: ['Peito', 'Tríceps', 'Ombro'] },
     { id: crypto.randomUUID?.() ?? '2', dia: 'Ter', nome: 'Treino B', tipo: 'Pull', cor: '#4a9e5a', tags: ['Costas', 'Bíceps'] },
