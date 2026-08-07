@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useTransition, useEffect, useRef, useMemo } from 'react'
+import { useState, useTransition, useEffect, useRef, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import type { Protocolo, Profile, HistoricoFase, Fase, DiaProtocolo, Suplemento } from '@/lib/types'
-import { actionSaveProtocolo, actionMudarFase } from './actions'
+import { createClient } from '@/lib/supabase/client'
 
 // ── Regras por fase (RASCUNHO — revisar antes de considerar definitivo) ──────
 const REGRAS_POR_FASE: Record<Fase, { num: string; title: string; desc: string }[]> = {
@@ -132,6 +132,26 @@ interface Props {
 
 type Tab = 'semana' | 'progresso' | 'suplementos' | 'cardio' | 'metas' | 'regras' | 'editar'
 
+// ── Helpers de salvamento (client-side) ───────────────────────────────────────
+async function saveProtocoloToDB(protocolo: Protocolo): Promise<{ success?: boolean; error?: string }> {
+  const sb = createClient()
+  const { data: { user } } = await sb.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const payload = { ...protocolo, user_id: user.id, updated_at: new Date().toISOString() }
+  console.log('[saveProtocoloToDB] payload:', JSON.stringify(payload, null, 2))
+
+  const { error } = await sb.from('protocolo').upsert(payload, { onConflict: 'user_id' })
+
+  if (error) {
+    console.error('[saveProtocoloToDB] error:', error)
+    return { error: error.message }
+  }
+
+  console.log('[saveProtocoloToDB] success')
+  return { success: true }
+}
+
 export default function ProtocoloClient({ protocolo: initialProtocolo, profile }: Props) {
   const [protocolo, setProtocolo] = useState<Protocolo>(initialProtocolo || {
     nome: 'Meu protocolo',
@@ -158,22 +178,24 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
   const protocoloRef = useRef(protocolo)
   protocoloRef.current = protocolo
 
-  function triggerAutoSave() {
+  const triggerAutoSave = useCallback(() => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
     saveTimeoutRef.current = setTimeout(() => {
       startTransition(async () => {
-        await actionSaveProtocolo(protocoloRef.current)
+        const res = await saveProtocoloToDB(protocoloRef.current)
+        if (res.error) console.error('[Auto-save] Falhou:', res.error)
+        else console.log('[Auto-save] OK')
       })
     }, 800)
-  }
+  }, [])
 
   // Dependências primitivas para disparar corretamente
   const suplementosKey = useMemo(() => JSON.stringify(protocolo.suplementos), [protocolo.suplementos])
   const diasKey = useMemo(() => JSON.stringify(protocolo.dias), [protocolo.dias])
 
-  useEffect(() => { triggerAutoSave() }, [protocolo.data_inicio, protocolo.duracao_semanas])
-  useEffect(() => { triggerAutoSave() }, [suplementosKey])
-  useEffect(() => { triggerAutoSave() }, [diasKey])
+  useEffect(() => { triggerAutoSave() }, [protocolo.data_inicio, protocolo.duracao_semanas, triggerAutoSave])
+  useEffect(() => { triggerAutoSave() }, [suplementosKey, triggerAutoSave])
+  useEffect(() => { triggerAutoSave() }, [diasKey, triggerAutoSave])
 
   const fi = FASE_INFO[protocolo.fase]
   const regrasAtivas = REGRAS_POR_FASE[protocolo.fase]
@@ -203,12 +225,12 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
     })
   }
 
-  function saveSuplChecks() {
-    startTransition(async () => {
-      const updated = { ...protocolo, suplementos_checks: { ...protocolo.suplementos_checks, [selectedSuplDate]: suplementosChecks[selectedSuplDate] } }
-      setProtocolo(updated)
-      await actionSaveProtocolo(updated)
-    })
+  async function saveSuplChecks() {
+    const updated = { ...protocolo, suplementos_checks: { ...protocolo.suplementos_checks, [selectedSuplDate]: suplementosChecks[selectedSuplDate] } }
+    setProtocolo(updated)
+    const res = await saveProtocoloToDB(updated)
+    if (res.error) console.error('[Supl Checks] Erro:', res.error)
+    else console.log('[Supl Checks] Salvo')
   }
 
   // CRUD Suplementos
@@ -216,7 +238,7 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
   const [editingSupl, setEditingSupl] = useState<Suplemento | null>(null)
   const [suplForm, setSuplForm] = useState<Partial<Suplemento>>({})
 
-  function handleSaveSupl(e: React.FormEvent) {
+  async function handleSaveSupl(e: React.FormEvent) {
     e.preventDefault()
     if (!suplForm.nome?.trim()) return
 
@@ -237,15 +259,20 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
     setShowSuplForm(false)
     setEditingSupl(null)
     setSuplForm({})
+    // Salva imediatamente
+    const res = await saveProtocoloToDB({ ...protocolo, suplementos: updated })
+    if (res.error) console.error('[Supl CRUD] Erro:', res.error)
   }
 
-  function handleDeleteSupl(id: string) {
+  async function handleDeleteSupl(id: string) {
     const updated = protocolo.suplementos.filter(s => s.id !== id)
     setProtocolo(prev => ({ ...prev, suplementos: updated }))
+    const res = await saveProtocoloToDB({ ...protocolo, suplementos: updated })
+    if (res.error) console.error('[Supl Delete] Erro:', res.error)
   }
 
   // ── Salvar protocolo (aba Editar) ──────────────────────────────────────────────
-  function handleSaveProtocolo(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSaveProtocolo(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
     const updated = {
@@ -255,25 +282,45 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
       cardio: fd.get('cardio') as string,
     }
     setProtocolo(updated)
-    startTransition(async () => { await actionSaveProtocolo(updated) })
+    const res = await saveProtocoloToDB(updated)
+    if (res.error) console.error('[Editar] Erro:', res.error)
   }
 
   // ── Mudar fase ──────────────────────────────────────────────────────────────
-  function handleMudarFase(e: React.FormEvent<HTMLFormElement>) {
+  async function handleMudarFase(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
     const novaFase = fd.get('fase') as Fase
     const novoNome = fd.get('nome') as string
-    const today = new Date().toISOString().split('T')[0]
+    const todayStr = new Date().toISOString().split('T')[0]
 
-    setProtocolo(prev => ({ ...prev, fase: novaFase, nome: novoNome || prev.nome, data_inicio: today }))
+    setProtocolo(prev => ({ ...prev, fase: novaFase, nome: novoNome || prev.nome, data_inicio: todayStr }))
     setShowModalFase(false)
 
     startTransition(async () => {
-      await actionMudarFase(novaFase, novoNome, protocolo.cardapio_ativo_id, {
-        fase: protocolo.fase, nome: protocolo.nome, dataInicio: protocolo.data_inicio,
-        kcalMeta: profile?.kcal_meta ?? 2000, protMeta: profile?.prot_meta ?? 160,
+      const sb = createClient()
+      const { data: { user } } = await sb.auth.getUser()
+      if (!user) return
+
+      // Arquiva fase atual no histórico
+      await sb.from('historico_fases').insert({
+        user_id: user.id,
+        fase: protocolo.fase,
+        nome: protocolo.nome,
+        data_inicio: protocolo.data_inicio,
+        data_fim: todayStr,
+        kcal_meta: profile?.kcal_meta ?? 2000,
+        prot_meta: profile?.prot_meta ?? 160,
       })
+
+      // Atualiza protocolo com nova fase
+      await sb.from('protocolo').update({
+        fase: novaFase,
+        nome: novoNome || protocolo.nome,
+        cardapio_ativo_id: protocolo.cardapio_ativo_id,
+        data_inicio: todayStr,
+        updated_at: new Date().toISOString(),
+      }).eq('user_id', user.id)
     })
   }
 
@@ -325,7 +372,7 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
         </div>
       </div>
 
-      {/* Cardápio ativo — agora é link direto pro guia de Dieta, não seletor */}
+      {/* Cardápio ativo — link pro guia de Dieta */}
       <Link href="/dieta" style={{ textDecoration: 'none' }}>
         <div style={{ ...card, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', transition: 'border-color .14s' }}>
           <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--amber-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>🍽</div>
@@ -382,7 +429,7 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
         <div>
           <div style={{ ...card, marginBottom: 14 }}>
             <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 12 }}>Progresso do protocolo</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10, marginBottom: 16 }}>
               <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 12 }}>
                 <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 4 }}>Início</div>
                 <input type="date" value={protocolo.data_inicio} onChange={(e) => setProtocolo(p => ({ ...p, data_inicio: e.target.value }))} style={inputStyle} />
@@ -393,48 +440,48 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
               </div>
             </div>
             {(protocolo.data_inicio && protocolo.duracao_semanas) && (() => {
-              const inicio = new Date(protocolo.data_inicio);
-              const fim = new Date(inicio);
-              fim.setDate(fim.getDate() + protocolo.duracao_semanas * 7);
-              const hoje = new Date();
-              hoje.setHours(0,0,0,0);
-              const totalDias = Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24));
-              const diasPassados = Math.ceil((hoje.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24));
-              const pct = Math.max(0, Math.min(100, Math.round((diasPassados / totalDias) * 100)));
-              const semanasTotais = protocolo.duracao_semanas;
-              const semanasPassadas = Math.floor(diasPassados / 7);
-              const semanasRestantes = Math.max(0, semanasTotais - semanasPassadas);
-              const diasRestantes = Math.max(0, totalDias - diasPassados);
+              const inicio = new Date(protocolo.data_inicio)
+              const fim = new Date(inicio)
+              fim.setDate(fim.getDate() + protocolo.duracao_semanas * 7)
+              const hoje = new Date()
+              hoje.setHours(0,0,0,0)
+              const totalDias = Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24))
+              const diasPassados = Math.ceil((hoje.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24))
+              const pct = Math.max(0, Math.min(100, Math.round((diasPassados / totalDias) * 100)))
+              const semanasTotais = protocolo.duracao_semanas
+              const semanasPassadas = Math.floor(diasPassados / 7)
+              const semanasRestantes = Math.max(0, semanasTotais - semanasPassadas)
+              const diasRestantes = Math.max(0, totalDias - diasPassados)
               return (
-                <div style={{ marginTop: 16 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 12 }}>
-                    <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 12, textAlign: 'center' }}>
-                      <div style={{ fontSize: 22, fontWeight: 800, fontFamily: 'var(--font-dm-mono)', color: 'var(--text)' }}>{semanasTotais}</div>
-                      <div style={{ fontSize: 10, color: 'var(--muted)' }}>semanas total</div>
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(70px,1fr))', gap: 8, marginBottom: 12 }}>
+                    <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 10, textAlign: 'center' }}>
+                      <div style={{ fontSize: 18, fontWeight: 800, fontFamily: 'var(--font-dm-mono)', color: 'var(--text)' }}>{semanasTotais}</div>
+                      <div style={{ fontSize: 9, color: 'var(--muted)' }}>semanas total</div>
                     </div>
-                    <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 12, textAlign: 'center' }}>
-                      <div style={{ fontSize: 22, fontWeight: 800, fontFamily: 'var(--font-dm-mono)', color: 'var(--blue)' }}>{semanasPassadas}</div>
-                      <div style={{ fontSize: 10, color: 'var(--muted)' }}>semanas passadas</div>
+                    <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 10, textAlign: 'center' }}>
+                      <div style={{ fontSize: 18, fontWeight: 800, fontFamily: 'var(--font-dm-mono)', color: 'var(--blue)' }}>{semanasPassadas}</div>
+                      <div style={{ fontSize: 9, color: 'var(--muted)' }}>semanas passadas</div>
                     </div>
-                    <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 12, textAlign: 'center' }}>
-                      <div style={{ fontSize: 22, fontWeight: 800, fontFamily: 'var(--font-dm-mono)', color: 'var(--amber)' }}>{semanasRestantes}</div>
-                      <div style={{ fontSize: 10, color: 'var(--muted)' }}>semanas restantes</div>
+                    <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 10, textAlign: 'center' }}>
+                      <div style={{ fontSize: 18, fontWeight: 800, fontFamily: 'var(--font-dm-mono)', color: 'var(--amber)' }}>{semanasRestantes}</div>
+                      <div style={{ fontSize: 9, color: 'var(--muted)' }}>semanas restantes</div>
                     </div>
-                    <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 12, textAlign: 'center' }}>
-                      <div style={{ fontSize: 22, fontWeight: 800, fontFamily: 'var(--font-dm-mono)', color: 'var(--red)' }}>{diasRestantes}</div>
-                      <div style={{ fontSize: 10, color: 'var(--muted)' }}>dias para o fim</div>
+                    <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 10, textAlign: 'center' }}>
+                      <div style={{ fontSize: 18, fontWeight: 800, fontFamily: 'var(--font-dm-mono)', color: 'var(--red)' }}>{diasRestantes}</div>
+                      <div style={{ fontSize: 9, color: 'var(--muted)' }}>dias p/ fim</div>
                     </div>
                   </div>
-                  <div style={{ background: 'var(--surface2)', borderRadius: 999, height: 8, overflow: 'hidden' }}>
+                  <div style={{ background: 'var(--surface2)', borderRadius: 999, height: 8, overflow: 'hidden', marginBottom: 8 }}>
                     <div style={{ width: `${pct}%`, height: '100%', background: 'var(--accent)', borderRadius: 999, transition: 'width 0.3s' }} />
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 11, color: 'var(--muted)' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8, fontSize: 10, color: 'var(--muted)' }}>
                     <span>Início: {new Date(protocolo.data_inicio).toLocaleDateString('pt-BR')}</span>
                     <span>Fim estimado: {fim.toLocaleDateString('pt-BR')}</span>
                     <span>{pct}%</span>
                   </div>
                 </div>
-              );
+              )
             })()}
 
             {/* Botão Salvar Progresso */}
@@ -442,15 +489,10 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
               <button
                 type="button"
                 onClick={async () => {
-                  console.log('[Progresso] Salvando manualmente:', protocolo);
-                  try {
-                    const res = await actionSaveProtocolo(protocolo);
-                    console.log('[Progresso] Resultado:', res);
-                    alert(res?.success ? 'Salvo com sucesso!' : `Erro: ${res?.error}`);
-                  } catch (e) {
-                    console.error('[Progresso] Erro:', e);
-                    alert('Erro ao salvar');
-                  }
+                  console.log('[Progresso] Salvando manualmente:', protocolo)
+                  const res = await saveProtocoloToDB(protocolo)
+                  console.log('[Progresso] Resultado:', res)
+                  alert(res?.success ? 'Salvo com sucesso!' : `Erro: ${res?.error}`)
                 }}
                 disabled={isPending}
                 style={{ ...btnP, ...btnSm }}
@@ -570,14 +612,27 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
               </div>
             )}
 
-            {/* Botão adicionar suplemento */}
-            <div style={{ marginTop: 16, textAlign: 'center' }}>
+            {/* Botões adicionar suplemento + salvar registro */}
+            <div style={{ marginTop: 16, display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
               <button
                 type="button"
                 onClick={() => { setEditingSupl(null); setSuplForm({}); setShowSuplForm(true) }}
                 style={{ ...btnP, ...btnSm }}
               >
                 + Adicionar suplemento
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  console.log('[Suplementos] Salvando registro completo:', protocolo)
+                  const res = await saveProtocoloToDB(protocolo)
+                  console.log('[Suplementos] Resultado:', res)
+                  alert(res?.success ? 'Registro salvo!' : `Erro: ${res?.error}`)
+                }}
+                disabled={isPending}
+                style={{ ...btnS, ...btnSm }}
+              >
+                {isPending ? 'Salvando...' : 'Salvar Registro'}
               </button>
             </div>
           </div>
