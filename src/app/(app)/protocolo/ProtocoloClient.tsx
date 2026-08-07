@@ -130,7 +130,7 @@ interface Props {
   historico?: HistoricoFase[]
 }
 
-type Tab = 'semana' | 'cardio' | 'metas' | 'regras' | 'editar'
+type Tab = 'semana' | 'progresso' | 'suplementos' | 'cardio' | 'metas' | 'regras' | 'editar'
 
 export default function ProtocoloClient({ protocolo: initialProtocolo, profile }: Props) {
   const [protocolo, setProtocolo] = useState<Protocolo>(initialProtocolo || {
@@ -198,6 +198,8 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
 
   const TABS: { key: Tab; label: string }[] = [
     { key: 'semana', label: '📅 Semana tipo' },
+    { key: 'progresso', label: '📈 Progresso' },
+    { key: 'suplementos', label: '💊 Suplementos' },
     { key: 'cardio', label: '🏃 Cárdio' },
     { key: 'metas', label: '🎯 Metas' },
     { key: 'regras', label: '⚡ Regras' },
