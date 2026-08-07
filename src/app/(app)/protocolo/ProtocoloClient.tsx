@@ -328,7 +328,7 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
   const [protocolo, setProtocolo] = useState<Protocolo>(initialProtocolo ?? {
     nome: 'Meu protocolo', desc_texto: '', cardio: '', fase: 'cutting',
     data_inicio: new Date().toISOString().split('T')[0],
-    cardapio_ativo_id: 'padrao', dias: [], duracao_semanas: 12,
+    cardapio_ativo_id: 'padrao', dias: [], duracao_semanas: undefined,
     suplementos: [],
     suplementos_checks: {},
   })
@@ -497,30 +497,34 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
         }, [protocolo.data_inicio, protocolo.duracao_semanas])
 
         // Validação de datas: impede fim < início
-        useEffect(() => {
-          if (progressoDataInicio && progressoDataFim) {
-            const inicio = new Date(progressoDataInicio)
-            const fim = new Date(progressoDataFim)
-            if (fim < inicio) {
-              // Ajusta fim para ser igual a início + duração atual
-              const duracaoAtual = protocolo.duracao_semanas ?? 12
-              const novoFim = new Date(progressoDataInicio)
-              novoFim.setDate(novoFim.getDate() + duracaoAtual * 7)
-              setProgressoDataFim(novoFim.toISOString().split('T')[0])
-            }
-          }
-        }, [progressoDataInicio, progressoDataFim])
+                useEffect(() => {
+                  if (progressoDataInicio && progressoDataFim) {
+                    const inicio = new Date(progressoDataInicio)
+                    const fim = new Date(progressoDataFim)
+                    if (fim < inicio) {
+                      // Ajusta fim para ser igual a início + duração atual
+                      const duracaoAtual = protocolo.duracao_semanas
+                      if (duracaoAtual) {
+                        const novoFim = new Date(progressoDataInicio)
+                        novoFim.setDate(novoFim.getDate() + duracaoAtual * 7)
+                        setProgressoDataFim(novoFim.toISOString().split('T')[0])
+                      }
+                    }
+                  }
+                }, [progressoDataInicio, progressoDataFim])
 
     function handleProgressoDataChange(campo: 'inicio' | 'fim', value: string) {
           if (campo === 'inicio') {
             setProgressoDataInicio(value)
             // Mantém a duração atual recalculando a data fim
-            const duracaoAtual = protocolo.duracao_semanas ?? 12
+            const duracaoAtual = protocolo.duracao_semanas
             const novoFim = new Date(value)
-            novoFim.setDate(novoFim.getDate() + duracaoAtual * 7)
+            if (duracaoAtual) {
+              novoFim.setDate(novoFim.getDate() + duracaoAtual * 7)
+            }
             const fimStr = novoFim.toISOString().split('T')[0]
             setProgressoDataFim(fimStr)
-            setProtocolo(prev => ({ ...prev, data_inicio: value, duracao_semanas: duracaoAtual }))
+            setProtocolo(prev => ({ ...prev, data_inicio: value }))
           } else {
             setProgressoDataFim(value)
             // Calcula duracao_semanas a partir da diferença entre fim e início (usando estados locais)
@@ -717,32 +721,33 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
                                                                 </div>
                                                               </>
                                                             ) : (
-                                                              <div style={{ ...card, textAlign: 'center', padding: 30 }}>
-                                                                <div style={{ fontSize: 28, marginBottom: 8 }}>📈</div>
-                                                                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6, color: 'var(--text)' }}>Progresso não ativado</div>
-                                                                <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 16, maxWidth: 300, marginLeft: 'auto', marginRight: 'auto' }}>
-                                                                  Clique abaixo para iniciar o acompanhamento da fase. A data de início vem do protocolo e o fim é calculado em 12 semanas (pode editar depois).
-                                                                </div>
-                                                                <button
-                                                                  onClick={() => {
-                                                                    const inicio = protocolo.data_inicio
-                                                                    const fim = new Date(inicio)
-                                                                    fim.setDate(fim.getDate() + (protocolo.duracao_semanas ?? 12) * 7)
-                                                                    const fimStr = fim.toISOString().split('T')[0]
-                                                                    setProgressoDataInicio(inicio)
-                                                                    setProgressoDataFim(fimStr)
-                                                                    setProtocolo(prev => ({
-                                                                      ...prev,
-                                                                      data_inicio: inicio,
-                                                                      duracao_semanas: protocolo.duracao_semanas ?? 12
-                                                                    }))
-                                                                  }}
-                                                                  style={{ ...btnP, padding: '12px 24px', fontSize: 13 }}
-                                                                >
-                                                                  🚀 Ativar progresso
-                                                                </button>
-                                                              </div>
-                                                            )}
+                                                                                                                          <div style={{ ...card, textAlign: 'center', padding: 30 }}>
+                                                                                                                            <div style={{ fontSize: 28, marginBottom: 8 }}>📈</div>
+                                                                                                                            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6, color: 'var(--text)' }}>Progresso não ativado</div>
+                                                                                                                            <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 16, maxWidth: 300, marginLeft: 'auto', marginRight: 'auto' }}>
+                                                                                                                              Clique abaixo para iniciar o acompanhamento da fase. A data de início vem do protocolo. Defina a data de fim depois.
+                                                                                                                            </div>
+                                                                                                                            <button
+                                                                                                                              onClick={() => {
+                                                                                                                                const inicio = protocolo.data_inicio
+                                                                                                                                setProgressoDataInicio(inicio)
+                                                                                                                                // Se já tem duração salva, calcula fim; senão deixa vazio pro usuário escolher
+                                                                                                                                if (protocolo.duracao_semanas) {
+                                                                                                                                  const fim = new Date(inicio)
+                                                                                                                                  fim.setDate(fim.getDate() + protocolo.duracao_semanas * 7)
+                                                                                                                                  const fimStr = fim.toISOString().split('T')[0]
+                                                                                                                                  setProgressoDataFim(fimStr)
+                                                                                                                                } else {
+                                                                                                                                  setProgressoDataFim('')
+                                                                                                                                }
+                                                                                                                                setProtocolo(prev => ({ ...prev, data_inicio: inicio }))
+                                                                                                                              }}
+                                                                                                                              style={{ ...btnP, padding: '12px 24px', fontSize: 13 }}
+                                                                                                                            >
+                                                                                                                              🚀 Ativar progresso
+                                                                                                                            </button>
+                                                                                                                          </div>
+                                                                                                                        )}
                           </div>
                         )}
 

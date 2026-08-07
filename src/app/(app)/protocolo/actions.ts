@@ -14,13 +14,20 @@ export async function actionSaveProtocolo(protocolo: Omit<Protocolo, 'user_id'>)
   const { sb, user } = await getUser()
   if (!user) return { error: 'Não autenticado' }
 
-  const { error } = await sb.from('protocolo').upsert(
-    { ...protocolo, user_id: user.id, updated_at: new Date().toISOString() },
-    { onConflict: 'user_id' }
-  )
-  if (error) return { error: error.message }
+  const payload = { ...protocolo, user_id: user.id, updated_at: new Date().toISOString() }
+  console.log('[actionSaveProtocolo] payload:', JSON.stringify(payload, null, 2))
+
+  const { error } = await sb.from('protocolo').upsert(payload, { onConflict: 'user_id' })
+  
+  if (error) {
+    console.error('[actionSaveProtocolo] error:', error)
+    return { error: error.message }
+  }
+  
+  console.log('[actionSaveProtocolo] success')
   revalidatePath('/protocolo')
   revalidatePath('/home')
+  return { success: true }
 }
 
 export async function actionMudarFase(novaFase: Fase, novoNome: string, novoCardapioId: string, faseAtual: {
