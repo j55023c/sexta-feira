@@ -31,7 +31,7 @@ interface Props {
 export default function SugestaoCardapioModal({ kcalMeta, protMeta, fase, onClose }: Props) {
   const router = useRouter()
   const [seed, setSeed] = useState(0)
-  const [cardapio, setCardapio] = useState<Record<MealKey, RefeicaoGerada>>(() => gerarCardapioDetalhado(kcalMeta, 0))
+  const [cardapio, setCardapio] = useState<Record<MealKey, RefeicaoGerada>>(() => gerarCardapioDetalhado(kcalMeta, fase, 0))
   const [isPending, startTransition] = useTransition()
   const [mensagem, setMensagem] = useState('')
 
@@ -45,7 +45,7 @@ export default function SugestaoCardapioModal({ kcalMeta, protMeta, fase, onClos
   function regenerar() {
     const novoSeed = seed + 1
     setSeed(novoSeed)
-    setCardapio(gerarCardapioDetalhado(kcalMeta, novoSeed))
+    setCardapio(gerarCardapioDetalhado(kcalMeta, fase, novoSeed))
     setMensagem('')
   }
 

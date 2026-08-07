@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useMemo, useEffect } from 'react'
+import { useState, useTransition, useMemo, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import type { Protocolo, Profile, HistoricoFase, Fase, DiaProtocolo, Suplemento } from '@/lib/types'
 import MobileSheet from '@/components/ui/MobileSheet'
@@ -358,23 +358,47 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
       return { pct, semanasTotais, semanasPassadas, semanasRestantes, diasRestantes, fim: fim.toISOString().split('T')[0] }
     }, [protocolo.data_inicio, protocolo.duracao_semanas])
 
-  // ── Salvar protocolo ────────────────────────────────────────────────────────
-  function handleSaveProtocolo(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const fd = new FormData(e.currentTarget)
-    const updated = {
-      ...protocolo,
-      nome: fd.get('nome') as string,
-      desc_texto: fd.get('desc') as string,
-      cardio: fd.get('cardio') as string,
-      duracao_semanas: Number(fd.get('duracao_semanas')) || undefined,
-    }
-    setProtocolo(updated)
-    startTransition(async () => { await actionSaveProtocolo(updated) })
-  }
+      // ── Salvar protocolo ────────────────────────────────────────────────────────
+      function handleSaveProtocolo(e: React.FormEvent<HTMLFormElement>) {
+        e.preventDefault()
+        const fd = new FormData(e.currentTarget)
+        const updated = {
+              ...protocolo,
+              nome: fd.get('nome') as string,
+              desc_texto: fd.get('desc') as string,
+              cardio: fd.get('cardio') as string,
+              duracao_semanas: Number(fd.get('duracao_semanas')) || undefined,
+            }
+        setProtocolo(updated)
+        startTransition(async () => { await actionSaveProtocolo(updated) })
+      }
 
-  // ── Mudar fase ──────────────────────────────────────────────────────────────
-  function handleMudarFase(e: React.FormEvent<HTMLFormElement>) {
+      // ── Auto-save debounced ─────────────────────────────────────────────────────
+      const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+      const isSavingRef = useRef(false)
+
+      function triggerAutoSave() {
+        if (isSavingRef.current) return
+        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+        saveTimeoutRef.current = setTimeout(() => {
+          isSavingRef.current = true
+          startTransition(async () => {
+            try {
+              await actionSaveProtocolo(protocolo)
+            } finally {
+              isSavingRef.current = false
+            }
+          })
+        }, 800) // debounce 800ms
+      }
+
+      // Auto-save quando campos críticos mudam
+      useEffect(() => {
+        triggerAutoSave()
+      }, [protocolo.duracao_semanas, protocolo.data_inicio, protocolo.suplementos, protocolo.suplementos_checks, protocolo.dias])
+
+      // ── Mudar fase ──────────────────────────────────────────────────────────────
+      function handleMudarFase(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
     const novaFase = fd.get('fase') as Fase
