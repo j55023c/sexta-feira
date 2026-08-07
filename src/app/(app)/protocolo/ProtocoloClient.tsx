@@ -222,7 +222,14 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
   // Load checks for selected date from protocolo.suplementos_checks
   useEffect(() => {
     const checks = protocolo.suplementos_checks?.[selectedSuplDate] || {}
-    setSuplementosChecks(prev => ({ ...prev, [selectedSuplDate]: checks }))
+    setSuplementosChecks(prev => {
+      // Só atualiza se for diferente do que já temos (evita loop)
+      const current = prev[selectedSuplDate] || {}
+      if (JSON.stringify(current) !== JSON.stringify(checks)) {
+        return { ...prev, [selectedSuplDate]: checks }
+      }
+      return prev
+    })
   }, [selectedSuplDate, protocolo.suplementos_checks])
 
   function toggleSuplCheck(suplId: string) {
@@ -445,18 +452,19 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
               <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 12 }}>
                 <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 4 }}>Duração (semanas)</div>
                 <input
-                  type="number"
-                  min="1"
-                  max="52"
-                  step="1"
+                  type="text"
                   value={protocolo.duracao_semanas ?? ''}
                   onChange={(e) => {
-                    const val = e.target.value
-                    setProtocolo(p => ({ ...p, duracao_semanas: val ? Math.floor(Number(val)) : undefined }))
+                    const val = e.target.value.replace(',', '.')
+                    const num = val ? Math.floor(Number(val)) : undefined
+                    if (num === undefined || (num >= 1 && num <= 52)) {
+                      setProtocolo(p => ({ ...p, duracao_semanas: num }))
+                    }
                   }}
                   style={inputStyle}
                   placeholder="Ex: 12"
                   inputMode="numeric"
+                  pattern="[0-9.,]*"
                 />
               </div>
             </div>
