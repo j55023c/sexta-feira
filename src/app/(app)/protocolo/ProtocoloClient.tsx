@@ -689,19 +689,37 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
                                     Semana <strong style={{ color: 'var(--text)' }}>{progressoEditavel.semanasPassadas}</strong> de <strong style={{ color: 'var(--text)' }}>{progressoEditavel.semanasTotais}</strong> · {progressoEditavel.diasRestantes} dias para o fim estimado
                                   </div>
                                 </div>
-                                <div style={{ borderLeft: '3px solid var(--accent)', padding: '9px 12px', background: 'var(--accent-glow-10)', borderRadius: '0 var(--radius) var(--radius) 0', fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.65 }}>
-                                  <strong style={{ color: 'var(--text)' }}>Dica:</strong> Edite as datas acima — o progresso recalcula automaticamente. A data de início também atualiza o protocolo.
-                                </div>
-                              </>
-                            ) : (
-                              <div style={{ ...card, textAlign: 'center', padding: 30 }}>
-                                <div style={{ fontSize: 28, marginBottom: 8 }}>📈</div>
-                                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6, color: 'var(--text)' }}>Datas não definidas</div>
-                                <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 16, maxWidth: 300, marginLeft: 'auto', marginRight: 'auto' }}>
-                                  Defina a data de início e fim acima para ver o progresso da fase, barra animada e contagem regressiva.
-                                </div>
-                              </div>
-                            )}
+                                                                <div style={{ borderLeft: '3px solid var(--accent)', padding: '9px 12px', background: 'var(--accent-glow-10)', borderRadius: '0 var(--radius) var(--radius) 0', fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.65 }}>
+                                                                  <strong style={{ color: 'var(--text)' }}>Dica:</strong> Edite as datas acima — o progresso recalcula automaticamente. A data de início também atualiza o protocolo.
+                                                                </div>
+                                                              </>
+                                                            ) : (
+                                                              <div style={{ ...card, textAlign: 'center', padding: 30 }}>
+                                                                <div style={{ fontSize: 28, marginBottom: 8 }}>📈</div>
+                                                                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6, color: 'var(--text)' }}>Progresso não ativado</div>
+                                                                <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 16, maxWidth: 300, marginLeft: 'auto', marginRight: 'auto' }}>
+                                                                  Clique abaixo para iniciar o acompanhamento da fase. A data de início vem do protocolo e o fim é calculado em 12 semanas (pode editar depois).
+                                                                </div>
+                                                                <button
+                                                                  onClick={() => {
+                                                                    const inicio = protocolo.data_inicio
+                                                                    const fim = new Date(inicio)
+                                                                    fim.setDate(fim.getDate() + (protocolo.duracao_semanas ?? 12) * 7)
+                                                                    const fimStr = fim.toISOString().split('T')[0]
+                                                                    setProgressoDataInicio(inicio)
+                                                                    setProgressoDataFim(fimStr)
+                                                                    setProtocolo(prev => ({
+                                                                      ...prev,
+                                                                      data_inicio: inicio,
+                                                                      duracao_semanas: protocolo.duracao_semanas ?? 12
+                                                                    }))
+                                                                  }}
+                                                                  style={{ ...btnP, padding: '12px 24px', fontSize: 13 }}
+                                                                >
+                                                                  🚀 Ativar progresso
+                                                                </button>
+                                                              </div>
+                                                            )}
                           </div>
                         )}
 
