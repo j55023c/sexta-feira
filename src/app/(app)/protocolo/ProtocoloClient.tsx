@@ -779,21 +779,18 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
                                                 )}
 
             {/* Tab: Editar */}
-                        {tab === 'editar' && (
-                          <form onSubmit={handleSaveProtocolo}>
-                            <div style={{ ...card, marginBottom: 14 }}>
-                              <Field label="Nome do protocolo">
-                                <input name="nome" type="text" defaultValue={protocolo.nome} placeholder="Ex: Push/Pull/Legs 6×/semana" style={inputStyle} />
-                              </Field>
-                              <Field label="Descrição curta">
-                                <textarea name="desc" rows={2} defaultValue={protocolo.desc_texto} style={{ ...inputStyle, resize: 'vertical', minHeight: 60 }} />
-                              </Field>
-                              <Field label="Duração da fase (semanas)">
-                                                              <input name="duracao_semanas" type="number" min="1" max="52" value={protocolo.duracao_semanas ?? ''} onChange={e => setProtocolo(prev => ({ ...prev, duracao_semanas: Number(e.target.value) || undefined }))} style={inputStyle} />
-                                                            </Field>
-                            </div>
+                                    {tab === 'editar' && (
+                                      <form onSubmit={handleSaveProtocolo}>
+                                        <div style={{ ...card, marginBottom: 14 }}>
+                                          <Field label="Nome do protocolo">
+                                            <input name="nome" type="text" defaultValue={protocolo.nome} placeholder="Ex: Push/Pull/Legs 6×/semana" style={inputStyle} />
+                                          </Field>
+                                          <Field label="Descrição curta">
+                                            <textarea name="desc" rows={2} defaultValue={protocolo.desc_texto} style={{ ...inputStyle, resize: 'vertical', minHeight: 60 }} />
+                                          </Field>
+                                        </div>
 
-                            <div style={{ ...card, marginBottom: 14 }}>
+                                        <div style={{ ...card, marginBottom: 14 }}>
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                                 <div style={{ fontSize: 14, fontWeight: 800 }}>Dias da semana</div>
                                 <button type="button" onClick={addDia} style={{ ...btnP, ...btnSm, fontSize: 11, padding: '6px 12px' }}>
