@@ -436,6 +436,28 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
                 </div>
               );
             })()}
+
+            {/* Botão Salvar Progresso */}
+            <div style={{ marginTop: 16, textAlign: 'center' }}>
+              <button
+                type="button"
+                onClick={async () => {
+                  console.log('[Progresso] Salvando manualmente:', protocolo);
+                  try {
+                    const res = await actionSaveProtocolo(protocolo);
+                    console.log('[Progresso] Resultado:', res);
+                    alert(res?.success ? 'Salvo com sucesso!' : `Erro: ${res?.error}`);
+                  } catch (e) {
+                    console.error('[Progresso] Erro:', e);
+                    alert('Erro ao salvar');
+                  }
+                }}
+                disabled={isPending}
+                style={{ ...btnP, ...btnSm }}
+              >
+                {isPending ? 'Salvando...' : 'Salvar alteração'}
+              </button>
+            </div>
           </div>
         </div>
       )}
