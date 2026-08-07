@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
-import type { Protocolo, Profile, HistoricoFase, Fase, DiaProtocolo } from '@/lib/types'
+import type { Protocolo, Profile, HistoricoFase, Fase, DiaProtocolo, Suplemento } from '@/lib/types'
 import { actionSaveProtocolo, actionMudarFase } from './actions'
 
 // ── Regras por fase (RASCUNHO — revisar antes de considerar definitivo) ──────
@@ -146,16 +146,102 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
       { id: 'sup_whey', nome: 'Whey', dose: '1 scoop', timing: '' },
       { id: 'sup_cafeina', nome: 'Cafeína', dose: '100mg', timing: '' },
     ],
+    suplementos_checks: {},
     duracao_semanas: undefined,
   })
   const [tab, setTab] = useState<Tab>('semana')
   const [showModalFase, setShowModalFase] = useState(false)
   const [isPending, startTransition] = useTransition()
 
+  // ── Auto-save debounced (800ms) ───────────────────────────────────────────────
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const protocoloRef = useRef(protocolo)
+  protocoloRef.current = protocolo
+
+  function triggerAutoSave() {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+    saveTimeoutRef.current = setTimeout(() => {
+      startTransition(async () => {
+        await actionSaveProtocolo(protocoloRef.current)
+      })
+    }, 800)
+  }
+
+  // Auto-save on key fields change
+  useEffect(() => { triggerAutoSave() }, [protocolo.data_inicio, protocolo.duracao_semanas])
+  useEffect(() => { triggerAutoSave() }, [protocolo.suplementos])
+  useEffect(() => { triggerAutoSave() }, [protocolo.dias])
+
   const fi = FASE_INFO[protocolo.fase]
   const regrasAtivas = REGRAS_POR_FASE[protocolo.fase]
 
-  // ── Salvar protocolo ────────────────────────────────────────────────────────
+  // ── Helpers para Suplementos (CRUD + checklist diário) ─────────────────────────
+  const today = new Date().toISOString().split('T')[0]
+
+  function generateId() {
+    return `sup_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+  }
+
+  // Checklist diário de suplementos (por data, sincronizado no Supabase via suplementos_checks JSONB)
+  const [suplementosChecks, setSuplementosChecks] = useState<Record<string, Record<string, boolean>>>({})
+  const [selectedSuplDate, setSelectedSuplDate] = useState(today)
+
+  // Load checks for selected date from protocolo.suplementos_checks
+  useEffect(() => {
+    const checks = protocolo.suplementos_checks?.[selectedSuplDate] || {}
+    setSuplementosChecks(prev => ({ ...prev, [selectedSuplDate]: checks }))
+  }, [selectedSuplDate, protocolo.suplementos_checks])
+
+  function toggleSuplCheck(suplId: string) {
+    setSuplementosChecks(prev => {
+      const dayChecks = { ...prev[selectedSuplDate] }
+      dayChecks[suplId] = !dayChecks[suplId]
+      return { ...prev, [selectedSuplDate]: dayChecks }
+    })
+  }
+
+  function saveSuplChecks() {
+    startTransition(async () => {
+      const updated = { ...protocolo, suplementos_checks: { ...protocolo.suplementos_checks, [selectedSuplDate]: suplementosChecks[selectedSuplDate] } }
+      setProtocolo(updated)
+      await actionSaveProtocolo(updated)
+    })
+  }
+
+  // CRUD Suplementos
+  const [showSuplForm, setShowSuplForm] = useState(false)
+  const [editingSupl, setEditingSupl] = useState<Suplemento | null>(null)
+  const [suplForm, setSuplForm] = useState<Partial<Suplemento>>({})
+
+  function handleSaveSupl(e: React.FormEvent) {
+    e.preventDefault()
+    if (!suplForm.nome?.trim()) return
+
+    let updated: Suplemento[]
+    if (editingSupl) {
+      updated = protocolo.suplementos.map(s => s.id === editingSupl.id ? { ...s, ...suplForm } as Suplemento : s)
+    } else {
+      const novo: Suplemento = {
+        id: generateId(),
+        nome: suplForm.nome!,
+        dose: suplForm.dose || '',
+        timing: suplForm.timing || '',
+      }
+      updated = [...protocolo.suplementos, novo]
+    }
+
+    setProtocolo(prev => ({ ...prev, suplementos: updated }))
+    setShowSuplForm(false)
+    setEditingSupl(null)
+    setSuplForm({})
+  }
+
+  function handleDeleteSupl(id: string) {
+    const updated = protocolo.suplementos.filter(s => s.id !== id)
+    setProtocolo(prev => ({ ...prev, suplementos: updated }))
+  }
+
+  // ── Salvar protocolo (aba Editar) ──────────────────────────────────────────────
   function handleSaveProtocolo(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
@@ -355,22 +441,175 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
       {tab === 'suplementos' && (
         <div>
           <div style={{ ...card, marginBottom: 14 }}>
-            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 12 }}>Suplementação diária</div>
-            {protocolo.suplementos.map((s, i) => (
-              <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: i < protocolo.suplementos.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                <input type="checkbox" style={{ width: 20, height: 20, accentColor: 'var(--accent)' }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>{s.nome}</div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>{s.dose} {s.timing ? `· ${s.timing}` : ''}</div>
-                </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <div style={{ fontSize: 14, fontWeight: 800 }}>Suplementação diária</div>
+              <input
+                type="date"
+                value={selectedSuplDate}
+                max={today}
+                onChange={e => setSelectedSuplDate(e.target.value)}
+                style={{ ...inputStyle, maxWidth: 180 }}
+              />
+            </div>
+
+            {/* Progress bar */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>
+                <span>Progresso hoje</span>
+                <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
+                  {Object.values(suplementosChecks[selectedSuplDate] || {}).filter(Boolean).length}/{protocolo.suplementos.length}
+                </span>
               </div>
-            ))}
+              <div style={{ height: 6, background: 'var(--surface2)', borderRadius: 3, overflow: 'hidden' }}>
+                <div
+                  style={{
+                    height: '100%',
+                    background: 'var(--accent)',
+                    borderRadius: 3,
+                    width: `${protocolo.suplementos.length > 0 ? Math.round((Object.values(suplementosChecks[selectedSuplDate] || {}).filter(Boolean).length / protocolo.suplementos.length) * 100) : 0}%`,
+                    transition: 'width .3s ease',
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Lista de suplementos com checkboxes */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {protocolo.suplementos.map((s) => {
+                const active = (suplementosChecks[selectedSuplDate] || {})[s.id]
+                return (
+                  <div
+                    key={s.id}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '10px 12px', borderRadius: 'var(--radius)',
+                      background: active ? 'var(--accent-glow-10)' : 'var(--surface)',
+                      border: active ? '1px solid var(--accent)' : '1px solid var(--border)',
+                      transition: 'all .13s',
+                      color: active ? 'var(--text)' : 'var(--muted)',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = active ? 'var(--accent-glow-10)' : 'var(--surface2)'
+                      const actions = e.currentTarget.querySelector('.supl-actions') as HTMLElement | null
+                      if (actions) actions.style.opacity = '1'
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = active ? 'var(--accent-glow-10)' : 'var(--surface)'
+                      const actions = e.currentTarget.querySelector('.supl-actions') as HTMLElement | null
+                      if (actions) actions.style.opacity = '0'
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => { toggleSuplCheck(s.id); saveSuplChecks() }}
+                      style={{
+                        width: 24, height: 24, borderRadius: 6, flexShrink: 0,
+                        border: active ? 'none' : '2px solid var(--border2)',
+                        background: active ? 'var(--accent)' : 'var(--surface2)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 13, cursor: 'pointer', padding: 0,
+                      }}
+                    >
+                      {active ? '✓' : ''}
+                    </button>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.nome}</div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {s.dose} {s.timing ? `· ${s.timing}` : ''}
+                      </div>
+                    </div>
+                    <div className="supl-actions" style={{ display: 'flex', gap: 4, opacity: 0, transition: 'opacity .13s' }}>
+                      <button
+                        type="button"
+                        onClick={() => { setEditingSupl(s); setSuplForm({ nome: s.nome, dose: s.dose, timing: s.timing }); setShowSuplForm(true) }}
+                        style={{ padding: '4px 8px', fontSize: 11, background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: 'var(--radius)', cursor: 'pointer' }}
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteSupl(s.id)}
+                        style={{ padding: '4px 8px', fontSize: 11, background: 'var(--red-bg)', border: '1px solid var(--red-border)', borderRadius: 'var(--radius)', color: 'var(--red)', cursor: 'pointer' }}
+                      >
+                        🗑
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
             {protocolo.suplementos.length === 0 && (
               <div style={{ textAlign: 'center', padding: '20px', color: 'var(--muted)' }}>
-                Nenhum suplemento cadastrado. Adicione na aba Editar.
+                Nenhum suplemento cadastrado. Adicione abaixo.
               </div>
             )}
+
+            {/* Botão adicionar suplemento */}
+            <div style={{ marginTop: 16, textAlign: 'center' }}>
+              <button
+                type="button"
+                onClick={() => { setEditingSupl(null); setSuplForm({}); setShowSuplForm(true) }}
+                style={{ ...btnP, ...btnSm }}
+              >
+                + Adicionar suplemento
+              </button>
+            </div>
           </div>
+
+          {/* Modal: Adicionar/Editar Suplemento */}
+          {showSuplForm && (
+            <div onClick={() => setShowSuplForm(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(25,23,20,.55)', backdropFilter: 'blur(3px)', zIndex: 200 }}>
+              <div onClick={e => e.stopPropagation()} style={{
+                position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+                width: 400, maxWidth: '95vw', background: 'var(--surface)',
+                border: '1px solid var(--border2)', borderRadius: 'var(--radius-lg)',
+                boxShadow: '0 20px 50px rgba(0,0,0,.18)', zIndex: 201,
+              }}>
+                <div style={{ padding: '16px 18px 13px', borderBottom: '1px solid var(--border2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 15, fontWeight: 800 }}>{editingSupl ? 'Editar suplemento' : 'Novo suplemento'}</span>
+                  <button onClick={() => setShowSuplForm(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 17 }}>✕</button>
+                </div>
+                <form onSubmit={handleSaveSupl} style={{ padding: 18 }}>
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={{ display: 'block', fontSize: 9.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 6 }}>Nome</label>
+                    <input
+                      type="text"
+                      value={suplForm.nome || ''}
+                      onChange={e => setSuplForm(prev => ({ ...prev, nome: e.target.value }))}
+                      placeholder="Ex: Creatina"
+                      style={inputStyle}
+                      autoFocus
+                    />
+                  </div>
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={{ display: 'block', fontSize: 9.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 6 }}>Dose</label>
+                    <input
+                      type="text"
+                      value={suplForm.dose || ''}
+                      onChange={e => setSuplForm(prev => ({ ...prev, dose: e.target.value }))}
+                      placeholder="Ex: 5g, 1 scoop, 100mg"
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div style={{ marginBottom: 18 }}>
+                    <label style={{ display: 'block', fontSize: 9.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 6 }}>Horário (opcional)</label>
+                    <input
+                      type="text"
+                      value={suplForm.timing || ''}
+                      onChange={e => setSuplForm(prev => ({ ...prev, timing: e.target.value }))}
+                      placeholder="Ex: Manhã, Pré-treino, Pós-treino, Noite"
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                    <button type="button" onClick={() => setShowSuplForm(false)} style={{ ...btnS, ...btnSm }}>Cancelar</button>
+                    <button type="submit" disabled={isPending} style={{ ...btnP, ...btnSm }}>{editingSupl ? 'Salvar' : 'Adicionar'}</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -56,6 +56,7 @@ export interface Protocolo {
   dias: DiaProtocolo[]
   duracao_semanas?: number
   suplementos: Suplemento[]
+  suplementos_checks?: Record<string, Record<string, boolean>>
   updated_at?: string
 }
 
