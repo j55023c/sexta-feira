@@ -111,34 +111,29 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function SuplementosTab({ 
   suplementos: suplementosIniciais, 
   onSuplementosChange, 
-  checks: checksIniciais,
-  onChecksChange,
   fi 
 }: { 
   suplementos: Suplemento[]; 
   onSuplementosChange: (sups: Suplemento[]) => void;
-  checks: Record<string, string[]>;
-  onChecksChange: (checks: Record<string, string[]>) => void;
   fi: typeof FASE_INFO[Fase]; 
 }) {
   const [suplementos, setSuplementos] = useState<Suplemento[]>(suplementosIniciais)
-  const [checks, setChecks] = useState<Record<string, string[]>>(checksIniciais)
   const [showForm, setShowForm] = useState(false)
   const [editingSup, setEditingSup] = useState<Suplemento | null>(null)
   const [form, setForm] = useState({ nome: '', dose: '', timing: '' })
   const hoje = new Date().toISOString().split('T')[0]
-  const marcadosHoje = new Set(checks[hoje] ?? [])
+  const [marcados, setMarcados] = useState<Record<string, boolean>>(() => {
+    if (typeof window === 'undefined') return {}
+    try {
+      const saved = localStorage.getItem(`suplementos_${hoje}`)
+      return saved ? JSON.parse(saved) : {}
+    } catch { return {} }
+  })
 
-  function toggle(supId: string) {
-    const atuais = new Set(checks[hoje] ?? [])
-    if (atuais.has(supId)) {
-      atuais.delete(supId)
-    } else {
-      atuais.add(supId)
-    }
-    const novoChecks = { ...checks, [hoje]: Array.from(atuais) }
-    setChecks(novoChecks)
-    onChecksChange(novoChecks)
+  function toggle(nome: string) {
+    const novo = { ...marcados, [nome]: !marcados[nome] }
+    setMarcados(novo)
+    localStorage.setItem(`suplementos_${hoje}`, JSON.stringify(novo))
   }
 
   function handleSaveSup(e: React.FormEvent) {
@@ -163,16 +158,9 @@ function SuplementosTab({
     const updated = suplementos.filter(s => s.id !== id)
     setSuplementos(updated)
     onSuplementosChange(updated)
-    // Remove também dos checks
-    const novoChecks = { ...checks }
-    Object.keys(novoChecks).forEach(date => {
-      novoChecks[date] = novoChecks[date].filter(sid => sid !== id)
-    })
-    setChecks(novoChecks)
-    onChecksChange(novoChecks)
   }
 
-  const completedCount = suplementos.filter(s => marcadosHoje.has(s.id)).length
+  const completedCount = suplementos.filter(s => marcados[s.nome] ?? false).length
 
   return (
     <div>
@@ -194,7 +182,7 @@ function SuplementosTab({
         {/* Progress bar */}
         <div style={{ marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>
-            <span>Progresso</span>
+            <span>Progresso hoje</span>
             <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{completedCount}/{suplementos.length}</span>
           </div>
           <div style={{ height: 6, background: 'var(--surface2)', borderRadius: 3, overflow: 'hidden' }}>
@@ -205,7 +193,7 @@ function SuplementosTab({
         {/* Grid 2 colunas */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           {suplementos.map((s) => {
-            const active = marcadosHoje.has(s.id)
+            const active = marcados[s.nome] ?? false
             return (
               <div
                 key={s.id}
@@ -230,7 +218,7 @@ function SuplementosTab({
               >
                 <button
                   type="button"
-                  onClick={() => toggle(s.id)}
+                  onClick={() => toggle(s.nome)}
                   style={{
                     width: 24, height: 24, borderRadius: 6, flexShrink: 0,
                     border: active ? 'none' : '2px solid var(--border2)',
@@ -266,7 +254,7 @@ function SuplementosTab({
         </div>
 
         <div style={{ marginTop: 10, padding: '10px 12px', background: 'var(--surface2)', borderRadius: 'var(--radius)', fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.6 }}>
-          <strong style={{ color: 'var(--text)' }}>Nota:</strong> A lista de suplementos e as marcações diárias sincronizam entre dispositivos.
+          <strong style={{ color: 'var(--text)' }}>Nota:</strong> A lista de suplementos sincroniza entre dispositivos. As marcações (✓) são locais por dia.
         </div>
       </div>
       <div style={{ borderLeft: '3px solid var(--accent)', padding: '9px 12px', background: 'var(--accent-glow-10)', borderRadius: '0 var(--radius) var(--radius) 0', fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.65 }}>
@@ -330,7 +318,6 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
     data_inicio: new Date().toISOString().split('T')[0],
     cardapio_ativo_id: 'padrao', dias: [], duracao_semanas: undefined,
     suplementos: [],
-    suplementos_checks: {},
   })
   const [tab, setTab] = useState<Tab>('semana')
   const [showModalFase, setShowModalFase] = useState(false)
@@ -396,8 +383,8 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
 
             // Auto-save quando campos críticos mudam
             useEffect(() => {
-              triggerAutoSave()
-            }, [protocolo.duracao_semanas, protocolo.data_inicio, protocolo.suplementos, protocolo.suplementos_checks, protocolo.dias])
+                          triggerAutoSave()
+                        }, [protocolo.duracao_semanas, protocolo.data_inicio, protocolo.suplementos, protocolo.dias])
 
       // ── Mudar fase ──────────────────────────────────────────────────────────────
       function handleMudarFase(e: React.FormEvent<HTMLFormElement>) {
@@ -728,24 +715,25 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
                                                                                                                               Clique abaixo para iniciar o acompanhamento da fase. A data de início vem do protocolo. Defina a data de fim depois.
                                                                                                                             </div>
                                                                                                                             <button
-                                                                                                                              onClick={() => {
-                                                                                                                                const inicio = protocolo.data_inicio
-                                                                                                                                setProgressoDataInicio(inicio)
-                                                                                                                                // Se já tem duração salva, calcula fim; senão deixa vazio pro usuário escolher
-                                                                                                                                if (protocolo.duracao_semanas) {
-                                                                                                                                  const fim = new Date(inicio)
-                                                                                                                                  fim.setDate(fim.getDate() + protocolo.duracao_semanas * 7)
-                                                                                                                                  const fimStr = fim.toISOString().split('T')[0]
-                                                                                                                                  setProgressoDataFim(fimStr)
-                                                                                                                                } else {
-                                                                                                                                  setProgressoDataFim('')
-                                                                                                                                }
-                                                                                                                                setProtocolo(prev => ({ ...prev, data_inicio: inicio }))
-                                                                                                                              }}
-                                                                                                                              style={{ ...btnP, padding: '12px 24px', fontSize: 13 }}
-                                                                                                                            >
-                                                                                                                              🚀 Ativar progresso
-                                                                                                                            </button>
+                                                                                                                                                                                              onClick={() => {
+                                                                                                                                                                                                console.log('[Ativar progresso] clicked')
+                                                                                                                                                                                                const inicio = protocolo.data_inicio
+                                                                                                                                                                                                console.log('[Ativar progresso] inicio:', inicio)
+                                                                                                                                                                                                setProgressoDataInicio(inicio)
+                                                                                                                                                                                                if (protocolo.duracao_semanas) {
+                                                                                                                                                                                                  const fim = new Date(inicio)
+                                                                                                                                                                                                  fim.setDate(fim.getDate() + protocolo.duracao_semanas * 7)
+                                                                                                                                                                                                  const fimStr = fim.toISOString().split('T')[0]
+                                                                                                                                                                                                  setProgressoDataFim(fimStr)
+                                                                                                                                                                                                } else {
+                                                                                                                                                                                                  setProgressoDataFim('')
+                                                                                                                                                                                                }
+                                                                                                                                                                                                setProtocolo(prev => ({ ...prev, data_inicio: inicio }))
+                                                                                                                                                                                              }}
+                                                                                                                                                                                              style={{ ...btnP, padding: '12px 24px', fontSize: 13, pointerEvents: 'auto', zIndex: 10 }}
+                                                                                                                                                                                            >
+                                                                                                                                                                                              🚀 Ativar progresso
+                                                                                                                                                                                            </button>
                                                                                                                           </div>
                                                                                                                         )}
                           </div>
@@ -814,15 +802,13 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
             )}
 
             {/* Tab: Suplementos */}
-                                                {tab === 'suplementos' && (
-                                                  <SuplementosTab 
-                                                    suplementos={protocolo.suplementos ?? []} 
-                                                    onSuplementosChange={(sups) => setProtocolo(prev => ({ ...prev, suplementos: sups }))}
-                                                    checks={protocolo.suplementos_checks ?? {}}
-                                                    onChecksChange={(cks) => setProtocolo(prev => ({ ...prev, suplementos_checks: cks }))}
-                                                    fi={fi} 
-                                                  />
-                                                )}
+                                                            {tab === 'suplementos' && (
+                                                              <SuplementosTab 
+                                                                suplementos={protocolo.suplementos ?? []} 
+                                                                onSuplementosChange={(sups) => setProtocolo(prev => ({ ...prev, suplementos: sups }))}
+                                                                fi={fi} 
+                                                              />
+                                                            )}
 
             {/* Tab: Editar */}
                                     {tab === 'editar' && (
