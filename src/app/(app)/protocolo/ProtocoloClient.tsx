@@ -167,10 +167,13 @@ export default function ProtocoloClient({ protocolo: initialProtocolo, profile }
     }, 800)
   }
 
-  // Auto-save on key fields change
+  // Dependências primitivas para disparar corretamente
+  const suplementosKey = useMemo(() => JSON.stringify(protocolo.suplementos), [protocolo.suplementos])
+  const diasKey = useMemo(() => JSON.stringify(protocolo.dias), [protocolo.dias])
+
   useEffect(() => { triggerAutoSave() }, [protocolo.data_inicio, protocolo.duracao_semanas])
-  useEffect(() => { triggerAutoSave() }, [protocolo.suplementos])
-  useEffect(() => { triggerAutoSave() }, [protocolo.dias])
+  useEffect(() => { triggerAutoSave() }, [suplementosKey])
+  useEffect(() => { triggerAutoSave() }, [diasKey])
 
   const fi = FASE_INFO[protocolo.fase]
   const regrasAtivas = REGRAS_POR_FASE[protocolo.fase]
